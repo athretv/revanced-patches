@@ -1091,6 +1091,6 @@
         </PreferenceScreen>
     </PreferenceScreen>
     <!-- PREFERENCE_SCREEN: TRANSLATIONS
-    <app.morphe.extension.youtube.settings.preference.TranslationsPreference android:title="@string/revanced_translations_title" android:key="revanced_translations" />PREFERENCE_SCREEN: TRANSLATIONS -->
+    PREFERENCE_SCREEN: TRANSLATIONS -->
 
 </PreferenceScreen>
