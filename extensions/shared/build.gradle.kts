@@ -5,11 +5,11 @@ plugins {
 }
 
 extension {
-    name = "extensions/shared.rve"
+    name = "extensions/shared.mpe"
 }
 
 android {
-    namespace = "app.revanced.extension"
+    namespace = "app.morphe.extension"
     compileSdk = 34
 
     defaultConfig {
@@ -39,21 +39,17 @@ dependencies {
 
     implementation(libs.collections4)
     implementation(libs.gson)
-    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.lang3)
-    implementation(libs.nanojson)
     implementation(libs.okhttp3)
     implementation(libs.protobuf.javalite)
 
-    implementation(libs.regex)
-    implementation(libs.retrofit)
     //noinspection UseTomlInstead
-    implementation("com.eclipsesource.j2v8:j2v8:6.2.1@aar")
-
-    implementation(libs.okhttp)
+    implementation("com.github.ynab:J2V8:6.2.1-16kb.2@aar")
 
     implementation(libs.nanohttpd)
     implementation(libs.protobuf.javalite)
+
+    implementation(libs.hiddenapi)
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     compileOnly(project(":extensions:shared:stub"))

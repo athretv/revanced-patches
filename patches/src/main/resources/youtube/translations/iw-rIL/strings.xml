@@ -20,6 +20,100 @@
     <string name="gms_core_settings_summary">כדי לקבל התראות ב-RVX, הפעל את Cloud Messaging.</string>
     <string name="gms_core_settings_title">פתח הגדרות GmsCore</string>
     <string name="gms_core_toast_not_installed_message">היישום MicroG GmsCore אינו מותקן. התקן אותו.</string>
+    <string name="morphe_disable_drc_audio_summary_off">אודיו DRC מופעל</string>
+    <string name="morphe_disable_drc_audio_summary_on">אודיו DRC מושבת</string>
+    <string name="morphe_disable_drc_audio_title">השבת אודיו DRC</string>
+    <string name="morphe_disable_quic_protocol_summary_off">פרוטוקול QUIC פעיל</string>
+    <string name="morphe_disable_quic_protocol_summary_on">פרוטוקול QUIC מושבת</string>
+    <string name="morphe_disable_quic_protocol_title">השבת פרוטוקול QUIC</string>
+    <string name="morphe_force_original_audio_not_available">כדי להשתמש בתכונה זו, שנה \'זיוף זרמי וידאו\' ל-Android Reel או TV</string>
+    <string name="morphe_force_original_audio_summary_off">שימוש בשמע ברירת מחדל</string>
+    <string name="morphe_force_original_audio_summary_on">שימוש בשפת שמע מקורית</string>
+    <string name="morphe_force_original_audio_title">כפה שפת שמע מקורית</string>
+    <string name="morphe_oauth2_connection_failure_auth_error">לא ניתן להתחבר ל-VR: %s</string>
+    <string name="morphe_oauth2_connection_failure_auth_not_approved">לא ניתן להתחבר ל-VR, אישור אימות אתר לא אושר</string>
+    <string name="morphe_oauth2_connection_failure_generic">Очнення временно недоступен</string>
+    <string name="morphe_oauth2_connection_failure_status">OAuth2 временно недоступен (статус %d)</string>
+    <string name="morphe_oauth2_connection_failure_status_400">התחברות לאנדרואיד VR פגה, נסה להתחבר ל-VR שוב</string>
+    <string name="morphe_oauth2_connection_failure_timeout">Очнення (способность  временно недоступен (время вышло)</string>
+    <string name="morphe_oauth2_toast_invalid">טוקן התחברות ל-VR לא חוקי, נסה להתחבר ל-VR שוב</string>
+    <string name="morphe_oauth2_toast_reset">Вышли из Android VR</string>
+    <string name="morphe_replace_music_with_youtube_summary_off">קישורים משותפים משתמשים ב-music.youtube.com</string>
+    <string name="morphe_replace_music_with_youtube_summary_on">קישורים משותפים משתמשים ב-youtube.com</string>
+    <string name="morphe_replace_music_with_youtube_title">שנה קישורי שיתוף ל-youtube.com</string>
+    <string name="morphe_sanitize_sharing_links_summary_off">פרמטר מעקב אינו מוסר מקישורי שיתוף</string>
+    <string name="morphe_sanitize_sharing_links_summary_on">פרמטר מעקב מוסר מקישורי שיתוף</string>
+    <string name="morphe_sanitize_sharing_links_title">טיהור קישורי שיתוף</string>
+    <string name="morphe_spoof_video_streams_about_experimental">• לקוח ניסיוני ועשוי להפסיק לפעול בכל עת</string>
+    <string name="morphe_spoof_video_streams_about_js">• אם הדהוד נכשל, ייתכן שהפלייבק יהיה כושל</string>
+    <string name="morphe_spoof_video_streams_about_no_audio_tracks">• תפריט ערוץ השמע חסר</string>
+    <string name="morphe_spoof_video_streams_about_no_av1">• אין קודק וידאו מסוג AV1</string>
+    <string name="morphe_spoof_video_streams_about_no_force_original_audio">• כפיית שמע מקורי אינה זמינה</string>
+    <string name="morphe_spoof_video_streams_about_no_immersive_mode">• מצב 360° VR אינו זמין</string>
+    <string name="morphe_spoof_video_streams_about_no_stable_volume">• עוצמת קול יציבה אינה זמינה</string>
+    <string name="morphe_spoof_video_streams_about_playback_failure">• הווידאו עשוי להיעצר בדקה 1:00, או ייתכן שלא יהיה זמין באזורים מסוימים</string>
+    <string name="morphe_spoof_video_streams_about_title">תופעות לוואי של התחזות</string>
+    <string name="morphe_spoof_video_streams_av1_summary_off">מקודד וידאו הוא AVC (H.264) או VP9</string>
+    <string name="morphe_spoof_video_streams_av1_summary_on">"מקודד וידאו הוא AVC (H.264), VP9, או AV1
+
+ההפעלה עשויה לגמגם או לדלג על פריימים"</string>
+    <string name="morphe_spoof_video_streams_av1_title">אפשר Android VR AV1</string>
+    <string name="morphe_spoof_video_streams_av1_user_dialog_message">"הפעלת הגדרה זו עשויה להשתמש בפענוח תוכנה של AV1.
+
+הפעלת וידאו עם AV1 עלולה לגרום לגמגום או לדלוג על פריימים."</string>
+    <string name="morphe_spoof_video_streams_client_type_title">לקוח ברירת מחדל</string>
+    <string name="morphe_spoof_video_streams_disable_player_js_update_summary_off">עדכון JavaScript של הנגן מופעל</string>
+    <string name="morphe_spoof_video_streams_disable_player_js_update_summary_on">"עדכון JavaScript של הנגן מושבת
+
+• נדרש hash JavaScript חוקי עבור הנגן
+• ההפעלה תיכשל אם ה-hash של JavaScript של הנגן בוטל ב-GVS"</string>
+    <string name="morphe_spoof_video_streams_disable_player_js_update_title">לשבט את עדכוני JavaScript של הנגן</string>
+    <string name="morphe_spoof_video_streams_disable_player_js_update_user_dialog_message">JavaScript hashes של השחקן תקפים לתקופה של כחודש, ו-hashes מיושנים עשויים להתבטל על ידי GVS.</string>
+    <string name="morphe_spoof_video_streams_no_clients_suggest_vr_toast">Попробуйте включить: Фальшивый поток &gt; Войти в Android VR</string>
+    <string name="morphe_spoof_video_streams_no_clients_toast">Не удалось получить доступ к потокам клиента</string>
+    <string name="morphe_spoof_video_streams_player_js_hash_summary">\"הזן hash JavaScript תקף של השחקן</string>
+    <string name="morphe_spoof_video_streams_player_js_hash_title">‌Ԓ԰՞ԑ JavaScript ԲՈԴ</string>
+    <string name="morphe_spoof_video_streams_player_js_variant_title">גירסת JavaScript של השחקן</string>
+    <string name="morphe_spoof_video_streams_screen_summary">זייף את זרמי הווידאו של הלקוח כדי למנוע בעיות השמעה</string>
+    <string name="morphe_spoof_video_streams_screen_title">זיוף זרמי וידאו</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_about_summary">Вы не вошли в Android VR. Нажмите здесь, чтобы войти</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_about_summary_disabled">Чтобы использовать эту функцию, измените \'Default client\' на Android VR</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_about_summary_signed_in">Вы вошли в Android VR</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_about_title">Войти в Android VR</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_activation_code_dialog_message">"Код активации: %s
+
+1. Нажмите «Открыть сайт» ниже, чтобы открыть сайт «Подключить устройство»
+2. Вставьте с буфера обмена (или введите) код активации, показанный выше
+3. Войдите в Google при запросе. Если у вас несколько аккаунтов, выберите этот аккаунт YouTube
+4. Нажмите «Разрешить доступ YouTube VR»
+5. Вернитесь в это приложение после появления сообщения «Устройство подключено»"</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_activation_code_dialog_open_website">Открыть сайт</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_activation_code_dialog_title">Инструкции</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_dialog_continue">Продолжить</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_dialog_not_signed_in_message">"התחברות לאנדרואיד VR תוכל לתקן בעיות תצוגה עבור כמה משתמשים
+
+להתחברות, לחץ על המשך למטה"</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_dialog_reset">Выйти</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_dialog_title">Войти в Android VR</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_success_dialog_message">"Аутентификация сохранена
+
+• Настройки Morphe не будут импортироваться/экспортироваться для аутентификации Android VR
+• Если это приложение не используется в течение 6 месяцев, Google удалит эту аутентификацию
+• Если вы измените пароль Google или снимете регистрацию этого устройства, вам придется войти снова"</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_success_dialog_title">Успешный вход</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_toast_get_activation_code_failed">Не удалось выдать код активации</string>
+    <string name="morphe_spoof_video_streams_sign_in_android_vr_toast_get_authorization_code_failed">Не удалось получить токен аутентификации</string>
+    <string name="morphe_spoof_video_streams_stats_for_nerds_summary_off">הלקוח מוסתר בנתונים לגיקים</string>
+    <string name="morphe_spoof_video_streams_stats_for_nerds_summary_on">סוג הלקוח מוצג בנתונים לגיקים</string>
+    <string name="morphe_spoof_video_streams_stats_for_nerds_title">הצג בנתונים לגיקים</string>
+    <string name="morphe_spoof_video_streams_summary_off">"זרמי וידאו אינם מזויפים
+
+ההשמעה עשויה שלא לפעול"</string>
+    <string name="morphe_spoof_video_streams_summary_on">"מתבצעת התחזות לזרמי וידאו
+
+אם אתה משתמש YouTube Premium, ייתכן שהגדרה זו אינה נחוצה"</string>
+    <string name="morphe_spoof_video_streams_title">זייף זרמי וידאו</string>
+    <string name="morphe_spoof_video_streams_user_dialog_message">כיבוי הגדרה זו עלול לגרום לבעיות השמעה.</string>
     <string name="revanced_advanced_video_quality_menu_summary_off">תפריט איכות סרטון מתקדם אינו מוצג</string>
     <string name="revanced_advanced_video_quality_menu_summary_on">תפריט איכות סרטון מתקדם מוצג</string>
     <string name="revanced_advanced_video_quality_menu_title">הצג תפריט איכות סרטון מתקדם</string>
@@ -31,6 +125,7 @@
 אם מופעל, כתובות URL של סרטונים יישלחו לשרת ה-API ושום נתונים אחרים לא יישלחו. אם לסרטון אין תמונות ממוזערות של DeArrow, אז מוצגות התמונות המקוריות או לכידות דוממות
 
 הקש כאן כדי ללמוד עוד על DeArrow"</string>
+    <string name="revanced_alt_thumbnail_dearrow_about_title">DeArrow</string>
     <string name="revanced_alt_thumbnail_dearrow_api_url_summary">כתובת ה-URL של הנקודת קצה מטמון תמונות ממוזערות של DeArrow</string>
     <string name="revanced_alt_thumbnail_dearrow_api_url_title">נקודת קצה של DeArrow API</string>
     <string name="revanced_alt_thumbnail_dearrow_connection_toast_summary_off">הודעה קופצת אינו מוצגת אם DeArrow אינו זמין</string>
@@ -86,6 +181,7 @@
     <string name="revanced_change_form_factor_entry_3">טאבלט</string>
     <string name="revanced_change_form_factor_entry_4">רכב</string>
     <string name="revanced_change_form_factor_entry_5">טאבלט (מינימום 600 dp)</string>
+    <string name="revanced_change_form_factor_entry_6">רכב</string>
     <string name="revanced_change_form_factor_title">גורם צורת הפריסה</string>
     <string name="revanced_change_form_factor_user_dialog_message">"השינויים כוללים:
 
@@ -95,6 +191,7 @@
 פריסת רכב
 • סרטוני Shorts נפתחים בנגן הרגיל
 • פיד מאורגן לפי נושאים וערוצים"</string>
+    <string name="revanced_change_live_ring_click_action_summary_off">שידור חי נפתח בעת לחיצה על טבעת הלייב.</string>
     <string name="revanced_change_player_flyout_menu_toggle_summary_off">נעשה שימוש במתגים.</string>
     <string name="revanced_change_player_flyout_menu_toggle_summary_on">נעשה שימוש בלחצני טקסט.</string>
     <string name="revanced_change_player_flyout_menu_toggle_title">שנה את סוג החלפת המצב</string>
@@ -193,11 +290,10 @@
     <string name="revanced_disable_rolling_number_animations_title">השבת הנפשות מספר מתגלגל</string>
     <string name="revanced_disable_signin_to_tv_popup_summary_off">חלון קופץ של כניסה לטלוויזיה מופעל</string>
     <string name="revanced_disable_signin_to_tv_popup_summary_on">חלון קופץ של כניסה לטלוויזיה מושבת</string>
-    <string name="revanced_disable_signin_to_tv_popup_title">השבת חלון קופץ של כניסה לטלוויזיה</string>
+    <string name="revanced_disable_signin_to_tv_popup_title">השבת חלון קופץ של \'כניסה לטלוויזיה\'</string>
     <string name="revanced_disable_translucent_status_bar_summary_off">שורת מצב אטומה או שקופה</string>
     <string name="revanced_disable_translucent_status_bar_summary_on">שורת מצב אטומה</string>
     <string name="revanced_disable_translucent_status_bar_title">השבת שורת מצב שקופה</string>
-    <string name="revanced_disable_translucent_status_bar_user_dialog_message">בחלק מהמכשירים, הפעלת תכונה זו עשויה לשנות את סרגל הניווט של המערכת לשקוף.</string>
     <string name="revanced_enable_seekbar_tapping_summary_off">הקשה בסרגל החיפוש מושבתת.</string>
     <string name="revanced_enable_seekbar_tapping_summary_on">הקשה בסרגל החיפוש מופעלת.</string>
     <string name="revanced_enable_seekbar_tapping_title">אפשר הקשה בסרגל החיפוש</string>
@@ -252,6 +348,9 @@
     <string name="revanced_hide_comments_thanks_button_summary_off">לחצן תודה מוצג</string>
     <string name="revanced_hide_comments_thanks_button_summary_on">לחצן תודה מוסתר</string>
     <string name="revanced_hide_comments_thanks_button_title">הסתר לחצן תודה</string>
+    <string name="revanced_hide_community_button_summary_off">הלחצן \'קהילה\' מוצג</string>
+    <string name="revanced_hide_community_button_summary_on">הלחצן \'קהילה\' מוסתר</string>
+    <string name="revanced_hide_community_button_title">הסתר לחצן קהילה</string>
     <string name="revanced_hide_creator_store_shelf_summary_off">מדף חנות היוצר מתחת לנגן הוידאו מוצג</string>
     <string name="revanced_hide_creator_store_shelf_summary_on">מדף חנות היוצר מתחת לנגן הוידאו מוסתר</string>
     <string name="revanced_hide_creator_store_shelf_title">הסתר מדף חנות היוצר</string>
@@ -267,6 +366,12 @@
     <string name="revanced_hide_expandable_card_summary_off">כרטיס הניתן להרחבה מתחת לסרטונים מוצג</string>
     <string name="revanced_hide_expandable_card_summary_on">כרטיס הניתן להרחבה מתחת לסרטונים מוסתר</string>
     <string name="revanced_hide_expandable_card_title">הסתר כרטיס הניתן להרחבה</string>
+    <string name="revanced_hide_featured_links_section_summary_off">קטע קישורים מוצגים מוצג</string>
+    <string name="revanced_hide_featured_links_section_summary_on">קטע קישורים מוצגים מוסתר</string>
+    <string name="revanced_hide_featured_links_section_title">הסתר קישורים מומלצים</string>
+    <string name="revanced_hide_featured_videos_section_summary_off">קטע סרטונים מוצגים מוצג</string>
+    <string name="revanced_hide_featured_videos_section_summary_on">קטע סרטונים מוצגים מוסתר</string>
+    <string name="revanced_hide_featured_videos_section_title">הסתר סרטונים מוצגים</string>
     <string name="revanced_hide_fullscreen_ads_summary_off">מודעות מסך מלא מוצגות</string>
     <string name="revanced_hide_fullscreen_ads_summary_on">"מודעות במסך מלא מוסתרות
 
@@ -275,12 +380,15 @@
     <string name="revanced_hide_general_ads_summary_off">מודעות כלליות מוצגות</string>
     <string name="revanced_hide_general_ads_summary_on">מודעות כלליות מוסתרות</string>
     <string name="revanced_hide_general_ads_title">הסתר מודעות כלליות</string>
-    <string name="revanced_hide_get_premium_summary_off">קידומי YouTube Premium תחת נגן הוידאו מוצגים</string>
-    <string name="revanced_hide_get_premium_summary_on">קידומי YouTube Premium תחת נגן הוידאו מוסתרים</string>
-    <string name="revanced_hide_get_premium_title">הסתר קידומי YouTube Premium</string>
+    <string name="revanced_hide_how_this_was_made_section_summary_off">מדור \'איך התוכן הזה נוצר\' מוצג</string>
+    <string name="revanced_hide_how_this_was_made_section_summary_on">מדור \'איך התוכן הזה נוצר\' מוסתר</string>
+    <string name="revanced_hide_how_this_was_made_section_title">הסתר את \'איך התוכן הזה נוצר\'</string>
     <string name="revanced_hide_hype_button_summary_off">לחצן באז מוצג</string>
     <string name="revanced_hide_hype_button_summary_on">לחצן באז מוסתר</string>
     <string name="revanced_hide_hype_button_title">הסתר באז</string>
+    <string name="revanced_hide_hype_points_summary_off">נקודות הייפ מוצגות</string>
+    <string name="revanced_hide_hype_points_summary_on">נקודות הייפ מוסתרות</string>
+    <string name="revanced_hide_hype_points_title">הסתר נקודות הייפ</string>
     <string name="revanced_hide_image_shelf_summary_off">מדף תמונות בתוצאות חיפוש מוצג</string>
     <string name="revanced_hide_image_shelf_summary_on">מדף תמונות בתוצאות חיפוש מוסתר</string>
     <string name="revanced_hide_image_shelf_title">הסתר מדף תמונות</string>
@@ -290,6 +398,9 @@
     <string name="revanced_hide_info_cards_summary_off">כרטיסי המידע מוצגים</string>
     <string name="revanced_hide_info_cards_summary_on">כרטיסי המידע מוסתרים</string>
     <string name="revanced_hide_info_cards_title">הסתר כרטיסי מידע</string>
+    <string name="revanced_hide_join_button_summary_off">לחצן הצטרפות מוצג</string>
+    <string name="revanced_hide_join_button_summary_on">לחצן הצטרפות מוסתר</string>
+    <string name="revanced_hide_join_button_title">הסתר לחצן \'הצטרפות\'</string>
     <string name="revanced_hide_key_concepts_section_summary_off">מדור מושגי מפתח מוצג</string>
     <string name="revanced_hide_key_concepts_section_summary_on">מדור מושגי מפתח מוסתר</string>
     <string name="revanced_hide_key_concepts_section_title">הסתר \'מושגי מפתח\'</string>
@@ -349,9 +460,6 @@
     <string name="revanced_hide_player_control_buttons_background_summary_off">רקע פקדי הנגן מוצג</string>
     <string name="revanced_hide_player_control_buttons_background_summary_on">רקע פקדי הנגן מוסתר</string>
     <string name="revanced_hide_player_control_buttons_background_title">הסתר רקע פקדי הנגן</string>
-    <string name="revanced_hide_podcast_section_summary_off">מדור \'גלה את הפודקאסט\' מוצג</string>
-    <string name="revanced_hide_podcast_section_summary_on">מדור \'גלה את הפודקאסט\' מוסתר</string>
-    <string name="revanced_hide_podcast_section_title">הסתר את \'גלה את הפודקאסט\'</string>
     <string name="revanced_hide_promote_button_summary_off">הלחצן \'קידום\' מוצג</string>
     <string name="revanced_hide_promote_button_summary_on">הלחצן \'קידום\' מוסתר</string>
     <string name="revanced_hide_promote_button_title">הסתר קידום</string>
@@ -385,6 +493,9 @@
     <string name="revanced_hide_shopping_links_summary_off">קישורי קניות בתיאור הסרטון מוצגים</string>
     <string name="revanced_hide_shopping_links_summary_on">קישורי קניות בתיאור הסרטון מוסתרים</string>
     <string name="revanced_hide_shopping_links_title">הסתר קישורי קניות</string>
+    <string name="revanced_hide_shorts_auto_dubbed_label_summary_off">תווית בדיבוב אוטומטי מוצגת</string>
+    <string name="revanced_hide_shorts_auto_dubbed_label_summary_on">תווית בדיבוב אוטומטי מוסתרת</string>
+    <string name="revanced_hide_shorts_auto_dubbed_label_title">הסתר תווית \'מדובב אוטומטית\'</string>
     <string name="revanced_hide_shorts_channel_bar_summary_off">סרגל הערוץ מוצג</string>
     <string name="revanced_hide_shorts_channel_bar_summary_on">סרגל הערוץ מוסתר</string>
     <string name="revanced_hide_shorts_channel_bar_title">הסתר סרגל ערוץ</string>
@@ -396,7 +507,7 @@
     <string name="revanced_hide_shorts_dislike_button_title">הסתר לחצן דיסלייק</string>
     <string name="revanced_hide_shorts_green_screen_button_summary_off">לחצן מסך ירוק מוצג</string>
     <string name="revanced_hide_shorts_green_screen_button_summary_on">לחצן מסך ירוק מוסתר</string>
-    <string name="revanced_hide_shorts_green_screen_button_title">הסתר לחצן מסך ירוק</string>
+    <string name="revanced_hide_shorts_green_screen_button_title">הסתר לחצן \'מסך ירוק\'</string>
     <string name="revanced_hide_shorts_hashtag_button_summary_off">לחצן hashtag מוצג</string>
     <string name="revanced_hide_shorts_hashtag_button_summary_on">לחצן hashtag מוסתר</string>
     <string name="revanced_hide_shorts_hashtag_button_title">הסתר לחצן hashtag</string>
@@ -409,12 +520,15 @@
     <string name="revanced_hide_shorts_like_button_summary_off">לחצן אהבתי מוצג</string>
     <string name="revanced_hide_shorts_like_button_summary_on">לחצן אהבתי מוסתר</string>
     <string name="revanced_hide_shorts_like_button_title">הסתר לחצן אהבתי</string>
+    <string name="revanced_hide_shorts_live_preview_summary_off">תצוגה מקדימה חיה מוצגת</string>
+    <string name="revanced_hide_shorts_live_preview_summary_on">תצוגה מקדימה חיה מוסתרת</string>
+    <string name="revanced_hide_shorts_live_preview_title">הסתר תצוגה מקדימה חיה</string>
     <string name="revanced_hide_shorts_navigation_bar_summary_off">סרגל ניווט מוצג</string>
     <string name="revanced_hide_shorts_navigation_bar_summary_on">סרגל ניווט מוסתר</string>
     <string name="revanced_hide_shorts_navigation_bar_title">הסתר סרגל ניווט</string>
     <string name="revanced_hide_shorts_new_posts_button_summary_off">לחצן \"פוסטים חדשים\" מוצג</string>
     <string name="revanced_hide_shorts_new_posts_button_summary_on">לחצן \"פוסטים חדשים\" מוסתר</string>
-    <string name="revanced_hide_shorts_new_posts_button_title">הסתר לחצן \"פוסטים חדשים\"</string>
+    <string name="revanced_hide_shorts_new_posts_button_title">הסתר לחצן \'פוסטים חדשים\'</string>
     <string name="revanced_hide_shorts_paused_overlay_buttons_summary_off">לחצני שכבת-על בעת השהיה מוצגים</string>
     <string name="revanced_hide_shorts_paused_overlay_buttons_summary_on">לחצני שכבת-על בעת השהיה מוסתרים</string>
     <string name="revanced_hide_shorts_paused_overlay_buttons_title">הסתר לחצני שכבת-על בעת השהיה</string>
@@ -454,6 +568,15 @@
     <string name="revanced_hide_stop_ads_button_summary_off">לחצן עצירת מודעות מוצג</string>
     <string name="revanced_hide_stop_ads_button_summary_on">לחצן עצירת מודעות מוסתר</string>
     <string name="revanced_hide_stop_ads_button_title">הסתר עצירת מודעות</string>
+    <string name="revanced_hide_store_button_summary_off">הלחצן \'חנות\' מוצג</string>
+    <string name="revanced_hide_store_button_summary_on">הלחצן \'חנות\' מוסתר</string>
+    <string name="revanced_hide_store_button_title">הסתר לחצן \'חנות\'</string>
+    <string name="revanced_hide_subscribe_button_in_channel_page_summary_off">הלחצן \'הירשם\' מוצג</string>
+    <string name="revanced_hide_subscribe_button_in_channel_page_summary_on">הלחצן \'הירשם\' מוסתר</string>
+    <string name="revanced_hide_subscribe_button_in_channel_page_title">הסתר לחצן \'הירשם\'</string>
+    <string name="revanced_hide_subscribe_button_summary_off">לחצן \'הירשם\' מוצג</string>
+    <string name="revanced_hide_subscribe_button_summary_on">לחצן \'הירשם\' מוסתר</string>
+    <string name="revanced_hide_subscribe_button_title">הסתר לחצן \'הירשם\'</string>
     <string name="revanced_hide_surveys_summary_off">הסקרים מוצגים</string>
     <string name="revanced_hide_surveys_summary_on">הסקרים מוסתרים</string>
     <string name="revanced_hide_surveys_title">הסתר סקרים</string>
@@ -475,12 +598,9 @@
     <string name="revanced_hide_video_recommendation_labels_summary_off">התוויות \'אנשים גם צפו\' ו\'אולי תאהב גם\' בתוצאות חיפוש מוצגות</string>
     <string name="revanced_hide_video_recommendation_labels_summary_on">התוויות \'אנשים גם צפו\' ו\'אולי תאהב גם\' בתוצאות החיפוש מוסתרות</string>
     <string name="revanced_hide_video_recommendation_labels_title">הסתר תוויות המלצות סרטונים</string>
-    <string name="revanced_hide_visit_community_button_summary_off">הלחצן \'מעבר לקהילה\' מוצג</string>
-    <string name="revanced_hide_visit_community_button_summary_on">הלחצן \'מעבר לקהילה\' מוסתר</string>
-    <string name="revanced_hide_visit_community_button_title">הסתר את הלחצן \'מעבר לקהילה\'</string>
-    <string name="revanced_hide_visit_store_button_summary_off">הלחצן \'בקר בחנות\' מוצג</string>
-    <string name="revanced_hide_visit_store_button_summary_on">הלחצן \'בקר בחנות\' מוסתר</string>
-    <string name="revanced_hide_visit_store_button_title">הסתר לחצן \'בקר בחנות\'</string>
+    <string name="revanced_hide_visual_spacer_summary_off">המפריד החזותי מוצג</string>
+    <string name="revanced_hide_visual_spacer_summary_on">המפריד החזותי מוסתר</string>
+    <string name="revanced_hide_visual_spacer_title">הסתר מפריד חזותי</string>
     <string name="revanced_hide_web_search_results_summary_off">תוצאות חיפוש באינטרנט מוצגות</string>
     <string name="revanced_hide_web_search_results_summary_on">תוצאות חיפוש באינטרנט מוסתרות</string>
     <string name="revanced_hide_web_search_results_title">הסתר תוצאות חיפוש באינטרנט</string>

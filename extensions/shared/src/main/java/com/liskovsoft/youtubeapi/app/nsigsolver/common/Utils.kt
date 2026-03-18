@@ -1,7 +1,7 @@
 package com.liskovsoft.youtubeapi.app.nsigsolver.common
 
-import app.revanced.extension.shared.utils.ResourceUtils.openRawResource
-import app.revanced.extension.shared.utils.Utils
+import app.morphe.extension.shared.utils.ResourceUtils.getRawResource
+import app.morphe.extension.shared.utils.Utils
 import com.liskovsoft.youtubeapi.app.nsigsolver.impl.V8ChallengeProvider.libPrefix
 
 internal open class ScriptLoaderError(message: String, cause: Exception? = null) :
@@ -14,8 +14,7 @@ internal fun loadScript(filename: String, errorMsg: String? = null): String {
         filename.replace(libPrefix, "")
             .replace(".js", "")
 
-    return openRawResource(fixedFilename).bufferedReader()
-        .use { it.readText() }
+    return getRawResource(fixedFilename)
 }
 
 internal fun loadScript(filenames: List<String>, errorMsg: String? = null): String {

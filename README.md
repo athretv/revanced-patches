@@ -1,10 +1,20 @@
-## 🧩 ReVanced Patches
+<div align="center"> 
+<img src="assets/rvx-logo.png" alt="RVX logo" width="128">
 
-ReVanced Extended Patches.
+    
+## 🧩 ReVanced Extended Patches
+[![Static Badge](https://img.shields.io/badge/RVX_Wiki-gray?logo=github)](https://github.com/anddea/revanced-patches/wiki)   [![Static Badge](https://img.shields.io/badge/Translations-gray?logo=crowdin)](https://rvxtranslate.netlify.app/)
+<br>
+[![Static Badge](https://img.shields.io/badge/Telegram-Community-gray?logo=telegram&color=%2326A5E4)](https://t.me/AnddeaChat)   [![Static Badge](https://img.shields.io/badge/Reddit-RVX-gray?logo=reddit&color=red)](https://reddit.com/r/revancedextended)   [![Static Badge](https://img.shields.io/badge/Reddit-YTAdvanced-gray?logo=reddit&color=yellow)](https://www.reddit.com/r/YTadvanced)
+</div>
 
 ## Documentation
 
 Check the [wiki](https://github.com/anddea/revanced-patches/wiki) for resources on patching, customization, and debugging.
+
+Report issues [here](https://github.com/inotia00/ReVanced_Extended).
+
+[Credits](https://github.com/anddea/revanced-patches/wiki/Credits)
 
 ## 📋 List of patches in this repository
 
@@ -80,6 +90,7 @@ Check the [wiki](https://github.com/anddea/revanced-patches/wiki) for resources 
 | `Translations for YouTube` | Add translations or remove string resources. | 19.05.36 ~ 20.05.46 |
 | `Video playback` | Adds options to customize settings related to video playback, such as default video quality and playback speed. | 19.05.36 ~ 20.05.46 |
 | `Visual preferences icons for YouTube` | Adds icons to specific preferences in the settings. | 19.05.36 ~ 20.05.46 |
+| `Voice Over Translation` | Adds an option to enable Yandex voice-over translation of video audio tracks. | 19.05.36 ~ 20.05.46 |
 </details>
 
 ### [📦 `com.google.android.apps.youtube.music`](https://play.google.com/store/apps/details?id=com.google.android.apps.youtube.music)
@@ -122,7 +133,7 @@ Check the [wiki](https://github.com/anddea/revanced-patches/wiki) for resources 
 | `Sanitize sharing links` | Adds an option to sanitize sharing links by removing tracking query parameters. | 6.20.51 ~ 8.30.54 |
 | `Settings for YouTube Music` | Applies mandatory patches to implement ReVanced Extended settings into the application. | 6.20.51 ~ 8.30.54 |
 | `SponsorBlock` | Adds options to enable and configure SponsorBlock, which can skip undesired video segments, such as non-music sections. | 6.20.51 ~ 8.30.54 |
-| `Spoof app version` | Adds options to spoof the YouTube Music client version. This can be used to restore old UI elements and features. | 6.42.55 ~ 8.30.54 |
+| `Spoof app version for lyrics` | Adds options to spoof the YouTube Music client version. This can be used to restore old lyrics UI. | 6.51.53 ~ 8.30.54 |
 | `Translations for YouTube Music` | Add translations or remove string resources. | 6.20.51 ~ 8.30.54 |
 | `Video playback` | Adds options to customize settings related to video playback, such as default video quality and playback speed. | 6.20.51 ~ 8.30.54 |
 | `Visual preferences icons for YouTube Music` | Adds icons to specific preferences in the settings. | 6.20.51 ~ 8.30.54 |
@@ -148,30 +159,7 @@ Check the [wiki](https://github.com/anddea/revanced-patches/wiki) for resources 
 | `Remove subreddit dialog` | Adds options to remove the NSFW community warning and notifications suggestion dialogs by dismissing them automatically. | 2024.17.0 ~ 2025.12.1 |
 | `Sanitize sharing links` | Adds an option to sanitize sharing links by removing tracking query parameters. | 2024.17.0 ~ 2025.12.1 |
 | `Settings for Reddit` | Applies mandatory patches to implement ReVanced Extended settings into the application. | 2024.17.0 ~ 2025.12.1 |
-</details>
-
-### [📦 `com.spotify.music`](https://play.google.com/store/apps/details?id=com.spotify.music)
-<details>
-
-| 💊 Patch | 📜 Description | 🏹 Target Version |
-|:--------:|:--------------:|:-----------------:|
-| `Change lyrics provider` | Changes the lyrics provider to a custom one. | ALL |
-| `Custom branding name for Spotify` | Changes the Spotify app name to the name specified in patch options. | ALL |
-| `Custom theme` | Applies a custom theme (defaults to amoled black) | ALL |
-| `Fix Facebook login` | Fix logging in with Facebook when the app is patched by always opening the login in a web browser window. | ALL |
-| `Fix third party launchers widgets` | Fixes Spotify widgets not working in third party launchers, like Nova Launcher. | ALL |
-| `Hide Create button` | Hides the "Create" button in the navigation bar. | ALL |
-| `Lyrics search` | Displays a "Search Lyrics" panel in the Main Activity that searches for lyrics on Google, and song meanings on Songtell. The activity is set to SpotifyMainActivity, so the "Search Lyrics" panel won't be shown in NowPlayingActivity (Player view) or possibly other activities. | ALL |
-| `Sanitize sharing links` | Removes the tracking query parameters from links before they are shared. | ALL |
-| `Unlock Premium` | Unlocks Spotify Premium features. Server-sided features like downloading songs are still locked. | ALL |
-</details>
-
-### [📦 `com.ysy.app.firewall`](https://play.google.com/store/apps/details?id=com.ysy.app.firewall)
-<details>
-
-| 💊 Patch | 📜 Description | 🏹 Target Version |
-|:--------:|:--------------:|:-----------------:|
-| `Unlock Premium` | Unlocks NetWall Premium features once 'Unlock Premium Now' button is clicked. | ALL |
+| `Translations for Reddit` | Add translations for RVX settings. | 2024.17.0 ~ 2025.12.1 |
 </details>
 
 
