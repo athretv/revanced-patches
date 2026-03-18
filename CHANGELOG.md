@@ -1,3 +1,10 @@
+## [1.9.1-dev.2](https://github.com/AykhanUV/revanced-patches/compare/v1.9.1-dev.1...v1.9.1-dev.2) (2026-03-18)
+
+
+### Bug Fixes
+
+* **YouTube Music:** revert old preferences ([21abba5](https://github.com/AykhanUV/revanced-patches/commit/21abba5b4336e9b62a20979f6bd159414e80297b))
+
 ## [1.9.1-dev.1](https://github.com/AykhanUV/revanced-patches/compare/v1.9.0...v1.9.1-dev.1) (2026-03-18)
 
 

@@ -1,7 +1,7 @@
 {
-  "created_at": "2026-03-18T14:31:28",
-  "description": "## [1.9.1-dev.1](https://github.com/AykhanUV/revanced-patches/compare/v1.9.0...v1.9.1-dev.1) (2026-03-18)\n\n\n### Bug Fixes\n\n* fix gradlew permission denied on CI runners ([778b053](https://github.com/AykhanUV/revanced-patches/commit/778b05330688a05fdc1cba2c88d1bfedf434fd8a))\n* idk ([5d882a9](https://github.com/AykhanUV/revanced-patches/commit/5d882a9b1641f00a1fc0fe0d73d98dc8d1412bca))\n* **YouTube:** revert old preferences ([5fcaee5](https://github.com/AykhanUV/revanced-patches/commit/5fcaee5f71f45b0c022bc352735d950b010501a3))",
-  "download_url": "https://github.com/AykhanUV/revanced-patches/releases/download/v1.9.1-dev.1/patches-1.9.1-dev.1.mpp",
-  "signature_download_url": "https://github.com/AykhanUV/revanced-patches/releases/download/v1.9.1-dev.1/patches-1.9.1-dev.1.mpp.asc",
-  "version": "1.9.1-dev.1"
+  "created_at": "2026-03-18T17:46:10",
+  "description": "## [1.9.1-dev.2](https://github.com/AykhanUV/revanced-patches/compare/v1.9.1-dev.1...v1.9.1-dev.2) (2026-03-18)\n\n\n### Bug Fixes\n\n* **YouTube Music:** revert old preferences ([21abba5](https://github.com/AykhanUV/revanced-patches/commit/21abba5b4336e9b62a20979f6bd159414e80297b))",
+  "download_url": "https://github.com/AykhanUV/revanced-patches/releases/download/v1.9.1-dev.2/patches-1.9.1-dev.2.mpp",
+  "signature_download_url": "https://github.com/AykhanUV/revanced-patches/releases/download/v1.9.1-dev.2/patches-1.9.1-dev.2.mpp.asc",
+  "version": "1.9.1-dev.2"
 }
