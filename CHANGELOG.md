@@ -1,3 +1,12 @@
+## [1.9.1-dev.1](https://github.com/AykhanUV/revanced-patches/compare/v1.9.0...v1.9.1-dev.1) (2026-03-18)
+
+
+### Bug Fixes
+
+* fix gradlew permission denied on CI runners ([778b053](https://github.com/AykhanUV/revanced-patches/commit/778b05330688a05fdc1cba2c88d1bfedf434fd8a))
+* idk ([5d882a9](https://github.com/AykhanUV/revanced-patches/commit/5d882a9b1641f00a1fc0fe0d73d98dc8d1412bca))
+* **YouTube:** revert old preferences ([5fcaee5](https://github.com/AykhanUV/revanced-patches/commit/5fcaee5f71f45b0c022bc352735d950b010501a3))
+
 # [1.9.0](https://github.com/AykhanUV/revanced-patches/compare/v1.8.0...v1.9.0) (2025-10-08)
 
 
