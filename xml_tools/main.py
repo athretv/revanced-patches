@@ -1,3 +1,5 @@
+# Copyright (C) 2026 anddea
+
 """CLI tool to run xml commands."""
 
 from __future__ import annotations
@@ -13,10 +15,12 @@ import click
 from config import Settings
 from core import log_process, setup_logging
 from handlers import (
+    check_duplicates,
     check_icons,
     check_prefs,
     check_prefs_reverse,
     check_strings,
+    dot_games,
     missing_strings,
     remove_unused_resources,
     remove_unused_strings,
@@ -64,9 +68,11 @@ class CLIConfig:
 @click.option("--remove-resources", is_flag=True, help="Remove unused resource files")
 @click.option("-s", "--sort", is_flag=True, help="Sort strings in XML files")
 @click.option("-c", "--check", is_flag=True, help="Run missing strings check")
+@click.option("-d", "--duplicates", is_flag=True, help="Run duplicate strings check")
 @click.option("-p", "--prefs", is_flag=True, help="Run missing preferences check")
 @click.option("-pr", "--reverse", is_flag=True, help="Run missing preferences check (reverse)")
 @click.option("--icons", is_flag=True, help="Check icon preference keys against XML.")
+@click.option("--dot", is_flag=True, help="Remove unwanted dots from YouTube and Music strings")
 @click.option(
     "--update-file",
     type=click.Path(exists=True, dir_okay=False, readable=True, path_type=Path),
@@ -79,7 +85,6 @@ class CLIConfig:
 )
 @click.option("--youtube", is_flag=True, help="Process YouTube")
 @click.option("--music", is_flag=True, help="Process Music")
-@click.option("--reddit", is_flag=True, help="Process Reddit")
 @click.option("--debug", is_flag=True, help="Enable debug logging")
 @click.pass_context
 def cli(ctx: click.Context, **kwargs: dict[str, Any]) -> None:
@@ -87,9 +92,9 @@ def cli(ctx: click.Context, **kwargs: dict[str, Any]) -> None:
     log_file = kwargs.get("log_file")
     log_file = log_file if isinstance(log_file, str) else None
 
-    flags = [bool(kwargs.get("youtube")), bool(kwargs.get("music")), bool(kwargs.get("reddit"))]
+    flags = [bool(kwargs.get("youtube")), bool(kwargs.get("music"))]
     if sum(flags) > 1:
-        exc: str = "You can only use one of --youtube, --music, or --reddit at a time."
+        exc: str = "You can only use one of --youtube or --music at a time."
         raise click.UsageError(exc)
 
     app: str = (
@@ -97,8 +102,6 @@ def cli(ctx: click.Context, **kwargs: dict[str, Any]) -> None:
         if kwargs.get("youtube")
         else "music"
         if kwargs.get("music")
-        else "reddit"
-        if kwargs.get("reddit")
         else "youtube"  # The default fallback if nothing is clicked
     )
     debug: bool = bool(kwargs.get("debug", False))
@@ -126,11 +129,13 @@ def cli(ctx: click.Context, **kwargs: dict[str, Any]) -> None:
         "remove_resources",
         "sort",
         "check",
+        "duplicates",
         "prefs",
         "reverse",
         "update_file",
         "update_from_diff",
         "icons",
+        "dot",
     ]
     if kwargs.get("run_all"):
         process_all(ctx.obj)
@@ -167,19 +172,20 @@ def process_all(config: CLIConfig) -> None:
         ("Remove Unused Strings (YouTube Music)", remove_unused_strings.process, ["music"]),
         ("Sort Strings (YouTube)", sort_strings.process, ["youtube"]),
         ("Sort Strings (YouTube Music)", sort_strings.process, ["music"]),
-        ("Sort Strings (Reddit)", sort_strings.process, ["reddit"]),
         ("Missing Strings Creation (YouTube)", missing_strings.process, ["youtube"]),
         ("Missing Strings Creation (YouTube Music)", missing_strings.process, ["music"]),
-        ("Missing Strings Creation (Reddit)", missing_strings.process, ["reddit"]),
         ("Remove Unused Resources (YouTube)", remove_unused_resources.process, ["youtube"]),
         ("Remove Unused Resources (YouTube Music)", remove_unused_resources.process, ["music"]),
         ("Missing Prefs Check", check_prefs.process, ["youtube", base_dir]),
         ("Missing Prefs Check (Reverse)", check_prefs_reverse.process, ["youtube", base_dir]),
         ("Missing Strings Check (YouTube)", check_strings.process, ["youtube", base_dir]),
         ("Missing Strings Check (YouTube Music)", check_strings.process, ["music", base_dir]),
+        ("Duplicate Strings Check (YouTube)", check_duplicates.process, ["youtube"]),
+        ("Duplicate Strings Check (YouTube Music)", check_duplicates.process, ["music"]),
         ("Check Icon Preferences", check_icons.process, ["youtube"]),
         ("Update Strings from Git Diff (YouTube)", update_from_diff.process, ["youtube"]),
         ("Update Strings from Git Diff (YouTube Music)", update_from_diff.process, ["music"]),
+        ("Remove Unwanted Dots", dot_games.process, []),
     ]
 
     for name, handler, args in handlers:
@@ -306,11 +312,13 @@ def handle_individual_operations(
         ("sort", "Sort Strings", sort_strings.process, (app,)),
         ("replace", "Replace Strings", replace_strings.process, (app, base_dir)),
         ("check", "Check Strings", check_strings.process, (app, base_dir)),
+        ("duplicates", "Check Duplicate Strings", check_duplicates.process, (app,)),
         ("prefs", "Check Preferences", check_prefs.process, (app, base_dir)),
         ("reverse", "Check Preferences (Reverse)", check_prefs_reverse.process, (app, base_dir)),
         ("update_file", "Update Strings from File", update_strings.process, (app, options.get("update_file"))),
         ("update_from_diff", "Update Forced Strings from Git Diff", update_from_diff.process, (app,)),
         ("icons", "Check Icon Preferences", check_icons.process, (app,)),
+        ("dot", "Remove Unwanted Dots", dot_games.process, ()),
     ]
 
     something_processed = False

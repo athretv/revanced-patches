@@ -1,3 +1,14 @@
+/*
+ * Portions of this file are ported from Morphe:
+ * Copyright 2026 Morphe.
+ * https://github.com/MorpheApp/morphe-patches
+ *
+ * Original hard forked code:
+ * https://github.com/ReVanced/revanced-patches/commit/724e6d61b2ecd868c1a9a37d465a688e83a74799
+ *
+ * See the included NOTICE file for GPLv3 §7(b) and §7(c) terms that apply to Morphe contributions.
+ */
+
 package app.morphe.patches.youtube.feed.components
 
 import app.morphe.patcher.Fingerprint
@@ -6,11 +17,11 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.patch.bytecodePatch
+import app.morphe.patcher.string
 import app.morphe.patcher.util.smali.ExternalLabel
 import app.morphe.patches.shared.litho.addLithoFilter
-import app.morphe.patches.shared.litho.emptyComponentLabel
 import app.morphe.patches.shared.mainactivity.onCreateMethod
-import app.morphe.patches.youtube.utils.compatibility.Constants.COMPATIBLE_PACKAGE
+import app.morphe.patches.youtube.utils.compatibility.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.patches.youtube.utils.engagement.engagementPanelHookPatch
 import app.morphe.patches.youtube.utils.extension.Constants.COMPONENTS_PATH
 import app.morphe.patches.youtube.utils.extension.Constants.FEED_CLASS_DESCRIPTOR
@@ -18,9 +29,10 @@ import app.morphe.patches.youtube.utils.mainactivity.mainActivityResolvePatch
 import app.morphe.patches.youtube.utils.navigation.navigationBarHookPatch
 import app.morphe.patches.youtube.utils.patch.PatchList.HIDE_FEED_COMPONENTS
 import app.morphe.patches.youtube.utils.playertype.playerTypeHookPatch
-import app.morphe.patches.youtube.utils.playservice.is_19_46_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_20_02_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_20_10_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_20_26_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_20_28_or_greater
 import app.morphe.patches.youtube.utils.playservice.versionCheckPatch
 import app.morphe.patches.youtube.utils.resourceid.bar
 import app.morphe.patches.youtube.utils.resourceid.captionToggleContainer
@@ -29,10 +41,11 @@ import app.morphe.patches.youtube.utils.resourceid.contentPill
 import app.morphe.patches.youtube.utils.resourceid.horizontalCardList
 import app.morphe.patches.youtube.utils.resourceid.relatedChipCloudMargin
 import app.morphe.patches.youtube.utils.resourceid.sharedResourceIdPatch
-import app.morphe.patches.youtube.utils.scrollTopParentFingerprint
 import app.morphe.patches.youtube.utils.settings.ResourceUtils.addPreference
 import app.morphe.patches.youtube.utils.settings.settingsPatch
 import app.morphe.util.REGISTER_TEMPLATE_REPLACEMENT
+import app.morphe.util.addInstructionsAtControlFlowLabel
+import app.morphe.util.findFreeRegister
 import app.morphe.util.fingerprint.injectLiteralInstructionViewCall
 import app.morphe.util.fingerprint.matchOrThrow
 import app.morphe.util.fingerprint.methodOrThrow
@@ -40,6 +53,7 @@ import app.morphe.util.getReference
 import app.morphe.util.indexOfFirstInstructionOrThrow
 import app.morphe.util.indexOfFirstInstructionReversedOrThrow
 import app.morphe.util.indexOfFirstLiteralInstructionOrThrow
+import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
@@ -60,7 +74,7 @@ val feedComponentsPatch = bytecodePatch(
     HIDE_FEED_COMPONENTS.title,
     HIDE_FEED_COMPONENTS.summary,
 ) {
-    compatibleWith(COMPATIBLE_PACKAGE)
+    compatibleWith(COMPATIBILITY_YOUTUBE)
 
     dependsOn(
         mainActivityResolvePatch,
@@ -138,25 +152,62 @@ val feedComponentsPatch = bytecodePatch(
 
         // region patch for hide floating button
 
-        onCreateMethod.apply {
-            val stringIndex = indexOfFirstInstructionOrThrow {
-                opcode == Opcode.CONST_STRING &&
-                        getReference<StringReference>()?.string == "fab"
-            }
-            val stringRegister = getInstruction<OneRegisterInstruction>(stringIndex).registerA
-            val insertIndex = indexOfFirstInstructionOrThrow(stringIndex) {
-                opcode == Opcode.INVOKE_DIRECT &&
-                        getReference<MethodReference>()?.name == "<init>"
-            }
-            val jumpIndex = indexOfFirstInstructionOrThrow(insertIndex, Opcode.CONST_STRING)
+        if (!is_20_28_or_greater) {
+            onCreateMethod.apply {
+                val stringIndex = indexOfFirstInstructionOrThrow {
+                    opcode == Opcode.CONST_STRING &&
+                            getReference<StringReference>()?.string == "fab"
+                }
+                val stringRegister = getInstruction<OneRegisterInstruction>(stringIndex).registerA
+                val insertIndex = indexOfFirstInstructionOrThrow(stringIndex) {
+                    opcode == Opcode.INVOKE_DIRECT &&
+                            getReference<MethodReference>()?.name == "<init>"
+                }
+                val jumpIndex = indexOfFirstInstructionOrThrow(insertIndex, Opcode.CONST_STRING)
 
-            addInstructionsWithLabels(
-                insertIndex, """
-                    invoke-static {v$stringRegister}, $FEED_CLASS_DESCRIPTOR->hideFloatingButton(Ljava/lang/String;)Ljava/lang/String;
-                    move-result-object v$stringRegister
-                    if-eqz v$stringRegister, :hide
-                    """, ExternalLabel("hide", getInstruction(jumpIndex))
+                addInstructionsWithLabels(
+                    insertIndex, """
+                        invoke-static {v$stringRegister}, $FEED_CLASS_DESCRIPTOR->hideFloatingButton(Ljava/lang/String;)Ljava/lang/String;
+                        move-result-object v$stringRegister
+                        if-eqz v$stringRegister, :hide
+                        """, ExternalLabel("hide", getInstruction(jumpIndex))
+                )
+            }
+        }
+
+        if (is_20_28_or_greater) {
+            val hideFloatingButtonFingerprint = Fingerprint(
+                accessFlags = listOf(AccessFlags.STATIC, AccessFlags.CONSTRUCTOR),
+                returnType = "V",
+                parameters = listOf(),
+                filters = listOf(
+                    string("fab"),
+                ),
+                custom = { method, _ ->
+                    method.name == "<clinit>"
+                }
             )
+
+            hideFloatingButtonFingerprint.let {
+                it.method.apply {
+                    val stringIndex = indexOfFirstInstructionOrThrow {
+                        opcode == Opcode.CONST_STRING &&
+                                getReference<StringReference>()?.string == "fab"
+                    }
+                    val stringRegister = getInstruction<OneRegisterInstruction>(stringIndex).registerA
+                    val insertIndex = indexOfFirstInstructionOrThrow(stringIndex) {
+                        opcode == Opcode.CONST_STRING &&
+                                getReference<StringReference>()?.string == "initFloatingActionButton"
+                    }
+
+                    addInstructions(
+                        insertIndex, """
+                            invoke-static {v$stringRegister}, $FEED_CLASS_DESCRIPTOR->hideFloatingButton(Ljava/lang/String;)Ljava/lang/String;
+                            move-result-object v$stringRegister
+                            """
+                    )
+                }
+            }
         }
 
         // endregion
@@ -266,43 +317,29 @@ val feedComponentsPatch = bytecodePatch(
 
         // region patch for hide mix playlists
 
-        elementParserFingerprint.matchOrThrow(elementParserParentFingerprint).let {
+        ParseElementFromBufferFingerprint.let {
             it.method.apply {
-                val freeRegister = implementation!!.registerCount - parameters.size - 2
-                val insertIndex = indexOfBufferParserInstruction(this)
+                val insertIndex = it.instructionMatches.first().index
+                val byteArrayParameter = "p3"
+                val returnEmptyComponentIndex = it.instructionMatches[4].index
+                val returnEmptyComponentInstruction = getInstruction(returnEmptyComponentIndex)
+                val returnEmptyComponentRegister =
+                    (returnEmptyComponentInstruction as FiveRegisterInstruction).registerC
+                val freeRegister = findFreeRegister(insertIndex, returnEmptyComponentRegister)
 
-                if (is_19_46_or_greater) {
-                    val objectIndex =
-                        indexOfFirstInstructionReversedOrThrow(insertIndex, Opcode.IGET_OBJECT)
-                    val objectRegister =
-                        getInstruction<TwoRegisterInstruction>(objectIndex).registerA
-
-                    addInstructionsWithLabels(
-                        insertIndex, """
-                            invoke-static {v$objectRegister, p3}, $FEED_COMPONENTS_FILTER_CLASS_DESCRIPTOR->filterMixPlaylists(Ljava/lang/Object;[B)Z
-                            move-result v$freeRegister
-                            if-eqz v$freeRegister, :ignore
-                            """ + emptyComponentLabel,
-                        ExternalLabel("ignore", getInstruction(insertIndex))
-                    )
-                } else {
-                    val objectIndex = indexOfFirstInstructionOrThrow(Opcode.MOVE_OBJECT)
-                    val objectRegister =
-                        getInstruction<TwoRegisterInstruction>(objectIndex).registerA
-                    val jumpIndex = it.instructionMatches.first().index
-
-                    addInstructionsWithLabels(
-                        insertIndex, """
-                            invoke-static {v$objectRegister, v$freeRegister}, $FEED_COMPONENTS_FILTER_CLASS_DESCRIPTOR->filterMixPlaylists(Ljava/lang/Object;[B)Z
-                            move-result v$freeRegister
-                            if-nez v$freeRegister, :filter
-                            """, ExternalLabel("filter", getInstruction(jumpIndex))
-                    )
-                    addInstruction(
-                        0,
-                        "move-object/from16 v$freeRegister, p3"
-                    )
-                }
+                addInstructionsAtControlFlowLabel(
+                    insertIndex,
+                    """
+                        invoke-static { $byteArrayParameter }, $FEED_COMPONENTS_FILTER_CLASS_DESCRIPTOR->filterMixPlaylists([B)Z
+                        move-result v$freeRegister
+                        if-eqz v$freeRegister, :show
+                        move-object v$returnEmptyComponentRegister, p1
+                        goto :return_empty_component
+                        :show
+                        nop
+                    """,
+                    ExternalLabel("return_empty_component", returnEmptyComponentInstruction),
+                )
             }
         }
 
@@ -327,7 +364,7 @@ val feedComponentsPatch = bytecodePatch(
         // region patch for hide channel tab
 
         val channelTabBuilderMethod =
-            channelTabBuilderFingerprint.methodOrThrow(scrollTopParentFingerprint)
+            channelTabBuilderFingerprint.methodOrThrow()
 
         channelTabRendererFingerprint.matchOrThrow().let {
             it.method.apply {
@@ -372,10 +409,17 @@ val feedComponentsPatch = bytecodePatch(
 
         // region add settings
 
+        val hideExpandableCard = if (is_20_26_or_greater) {
+            "SETTINGS: HIDE_EXPANDABLE_CARD"
+        } else {
+            "SETTINGS: LEGACY_HIDE_EXPANDABLE_CARD"
+        }
+
         addPreference(
             arrayOf(
                 "PREFERENCE_SCREEN: FEED",
-                "SETTINGS: HIDE_FEED_COMPONENTS"
+                "SETTINGS: HIDE_FEED_COMPONENTS",
+                hideExpandableCard
             ),
             HIDE_FEED_COMPONENTS
         )

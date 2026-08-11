@@ -6,7 +6,7 @@ import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patches.music.utils.ACTION_BAR_POSITION_FEATURE_FLAG
 import app.morphe.patches.music.utils.actionBarPositionFeatureFlagFingerprint
-import app.morphe.patches.music.utils.compatibility.Constants.COMPATIBLE_PACKAGE
+import app.morphe.patches.music.utils.compatibility.Constants.COMPATIBILITY_YOUTUBE_MUSIC
 import app.morphe.patches.music.utils.extension.Constants.UTILS_PATH
 import app.morphe.patches.music.utils.patch.PatchList.RETURN_YOUTUBE_DISLIKE
 import app.morphe.patches.music.utils.playservice.is_7_17_or_greater
@@ -103,7 +103,7 @@ enum class Vote(val value: Int) {
     REMOVE_LIKE(0),
 }
 
-private const val ABOUT_CATEGORY_KEY = "revanced_ryd_about"
+private const val ABOUT_CATEGORY_KEY = "revanced_ryd_about_category"
 private const val RYD_ATTRIBUTION_KEY = "revanced_ryd_attribution"
 
 @Suppress("unused")
@@ -111,7 +111,7 @@ val returnYouTubeDislikePatch = resourcePatch(
     RETURN_YOUTUBE_DISLIKE.title,
     RETURN_YOUTUBE_DISLIKE.summary,
 ) {
-    compatibleWith(COMPATIBLE_PACKAGE)
+    compatibleWith(COMPATIBILITY_YOUTUBE_MUSIC)
 
     dependsOn(
         returnYouTubeDislikeBytecodePatch,
@@ -151,7 +151,8 @@ val returnYouTubeDislikePatch = resourcePatch(
 
         addPreferenceCategoryUnderPreferenceScreen(
             CategoryType.RETURN_YOUTUBE_DISLIKE.value,
-            ABOUT_CATEGORY_KEY
+            ABOUT_CATEGORY_KEY,
+            "morphe_music_crossfade_about_title",
         )
 
         document(SETTINGS_HEADER_PATH).use { document ->
@@ -175,4 +176,3 @@ val returnYouTubeDislikePatch = resourcePatch(
 
     }
 }
-

@@ -45,13 +45,10 @@ public class SpoofAppVersionPreference extends CustomDialogListPreference {
      * Enum representing supported YouTube Music app with their display names, package names.
      */
     private enum AppVersion {
+        YT_20_20_42(),
         YT_20_13_41(),
         YT_20_05_46(),
-        YT_19_33_37(),
-        YT_19_28_42(),
-        YT_19_26_42(),
-        YT_19_01_34(),
-        OTHER(sf("revanced_spoof_app_version_other_item").toString());
+        OTHER(sf("revanced_external_downloader_other_item").toString());
 
         @NonNull
         public static AppVersion findAppVersion(String versionName) {

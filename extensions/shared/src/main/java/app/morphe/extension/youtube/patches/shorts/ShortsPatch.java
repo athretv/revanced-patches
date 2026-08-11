@@ -15,6 +15,7 @@ import java.lang.ref.WeakReference;
 
 import app.morphe.extension.shared.utils.Logger;
 import app.morphe.extension.shared.utils.ResourceUtils;
+import app.morphe.extension.youtube.patches.player.OpenVideosFullscreenHookPatch;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.NavigationBar.NavigationButton;
 import app.morphe.extension.youtube.shared.ShortsPlayerState;
@@ -23,6 +24,12 @@ import kotlin.Unit;
 
 @SuppressWarnings("unused")
 public class ShortsPatch {
+    public enum ShortsPlayerType {
+        SHORTS_PLAYER,
+        REGULAR_PLAYER,
+        REGULAR_PLAYER_FULLSCREEN
+    }
+
     private static final boolean ENABLE_SHORTS_TIME_STAMP =
             Settings.ENABLE_SHORTS_TIME_STAMP.get();
     private static final boolean ENABLE_SHORTS_CLEAR_MODE =
@@ -77,10 +84,6 @@ public class ShortsPatch {
 
     public static void hideShortsCommentsButton(View view) {
         hideViewUnderCondition(Settings.HIDE_SHORTS_COMMENTS_BUTTON.get(), view);
-    }
-
-    public static boolean hideShortsDislikeButton() {
-        return Settings.HIDE_SHORTS_DISLIKE_BUTTON.get();
     }
 
     public static ViewGroup hideShortsInfoPanel(ViewGroup viewGroup) {
@@ -190,7 +193,8 @@ public class ShortsPatch {
 
     public static boolean openShortInRegularPlayer(String videoId) {
         try {
-            if (!Settings.OPEN_SHORTS_IN_REGULAR_PLAYER.get()) {
+            ShortsPlayerType shortsPlayerType = Settings.SHORTS_PLAYER_TYPE.get();
+            if (shortsPlayerType == ShortsPlayerType.SHORTS_PLAYER) {
                 return false; // Default unpatched behavior.
             }
 
@@ -214,9 +218,13 @@ public class ShortsPatch {
                 return false; // Always use Shorts player for the Shorts nav button.
             }
 
+            OpenVideosFullscreenHookPatch.setOpenNextVideoFullscreen(
+                    shortsPlayerType == ShortsPlayerType.REGULAR_PLAYER_FULLSCREEN
+            );
             VideoUtils.openVideo(videoId, true);
             return true;
         } catch (Exception ex) {
+            OpenVideosFullscreenHookPatch.setOpenNextVideoFullscreen(null);
             Logger.printException(() -> "openShortInRegularPlayer failure", ex);
             return false;
         }

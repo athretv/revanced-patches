@@ -22,7 +22,6 @@ import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.RoundRectShape;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -44,8 +43,6 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
-import android.widget.Button;
-import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
@@ -90,6 +87,7 @@ public class Utils {
     @SuppressLint("StaticFieldLeak")
     static volatile Context context;
     private static Locale contextLocale;
+    private static boolean appIsUsingBoldIcons;
 
     // Cached Collator instance with its locale.
     @Nullable
@@ -102,6 +100,14 @@ public class Utils {
 
     protected Utils() {
     } // utility class
+
+    public static boolean isNotEmpty(String value) {
+        return value != null && !value.isEmpty();
+    }
+
+    public static String getAppVersionName() {
+        return PackageUtils.getAppVersionName();
+    }
 
     public static void clickView(View view) {
         if (view == null) return;
@@ -161,6 +167,7 @@ public class Utils {
         viewGroup.removeView(view);
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean isWebViewSupported() {
         try {
             CookieManager.getInstance();
@@ -219,10 +226,12 @@ public class Utils {
     }
 
     public static int indexOfFirstFound(@NonNull String value, @NonNull String... targets) {
-        for (String string : targets) {
-            if (!string.isEmpty()) {
-                final int indexOf = value.indexOf(string);
-                if (indexOf >= 0) return indexOf;
+        if (isNotEmpty(value)) {
+            for (String string : targets) {
+                if (!string.isEmpty()) {
+                    final int indexOf = value.indexOf(string);
+                    if (indexOf >= 0) return indexOf;
+                }
             }
         }
         return -1;
@@ -318,6 +327,14 @@ public class Utils {
         return context;
     }
 
+    public static boolean appIsUsingBoldIcons() {
+        return appIsUsingBoldIcons;
+    }
+
+    public static void setAppIsUsingBoldIcons(boolean boldIcons) {
+        appIsUsingBoldIcons = boldIcons;
+    }
+
     public static Resources getResources() {
         return getResources(true);
     }
@@ -368,7 +385,6 @@ public class Utils {
                     Utils.contextLocale = contextLocale;
 
                     // If they are different, overrides the Locale of the Context and resource.
-                    Locale.setDefault(applicationLocale);
                     Configuration configuration = new Configuration(mContext.getResources().getConfiguration());
                     configuration.setLocale(applicationLocale);
                     return mContext.createConfigurationContext(configuration);
@@ -384,7 +400,6 @@ public class Utils {
     public static void resetLocalizedContext() {
         try {
             if (contextLocale != null) {
-                Locale.setDefault(contextLocale);
                 Context mContext = getContext();
                 if (mContext != null) {
                     Configuration configuration = new Configuration(getResources(false).getConfiguration());

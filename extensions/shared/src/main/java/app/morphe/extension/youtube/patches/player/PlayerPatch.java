@@ -6,17 +6,22 @@ import static app.morphe.extension.shared.utils.Utils.hideViewUnderCondition;
 import static app.morphe.extension.shared.utils.Utils.validateValue;
 
 import android.content.Context;
+import android.os.Build;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewStub;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 
 import com.google.android.libraries.youtube.innertube.model.media.VideoQuality;
@@ -35,6 +40,7 @@ import app.morphe.extension.shared.settings.IntegerSetting;
 import app.morphe.extension.shared.utils.Logger;
 import app.morphe.extension.shared.utils.ResourceUtils;
 import app.morphe.extension.shared.utils.Utils;
+import app.morphe.extension.youtube.innertube.NextResponseOuterClass.NewElement;
 import app.morphe.extension.youtube.patches.utils.InitializationPatch;
 import app.morphe.extension.youtube.patches.utils.PatchStatus;
 import app.morphe.extension.youtube.settings.Settings;
@@ -220,21 +226,41 @@ public class PlayerPatch {
         return Settings.DISABLE_HAPTIC_FEEDBACK_CHAPTERS.get();
     }
 
-
-    public static boolean disableSeekVibrate() {
-        return Settings.DISABLE_HAPTIC_FEEDBACK_SEEK.get();
+    public static boolean disablePreciseSeekingVibrate() {
+        return Settings.DISABLE_HAPTIC_FEEDBACK_PRECISE_SEEKING.get();
     }
 
     public static boolean disableSeekUndoVibrate() {
         return Settings.DISABLE_HAPTIC_FEEDBACK_SEEK_UNDO.get();
     }
 
-    public static boolean disableScrubbingVibrate() {
-        return Settings.DISABLE_HAPTIC_FEEDBACK_SCRUBBING.get();
+    public static Object disableTapAndHoldVibrate(Object vibrator) {
+        return Settings.DISABLE_HAPTIC_FEEDBACK_TAP_AND_HOLD.get()
+                ? null
+                : vibrator;
     }
 
     public static boolean disableZoomVibrate() {
         return Settings.DISABLE_HAPTIC_FEEDBACK_ZOOM.get();
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    public static void vibrate(Vibrator vibrator, VibrationEffect vibrationEffect) {
+        if (disableVibrate()) return;
+        vibrator.vibrate(vibrationEffect);
+    }
+
+    public static void vibrate(Vibrator vibrator, long milliseconds) {
+        if (disableVibrate()) return;
+        vibrator.vibrate(milliseconds);
+    }
+
+    private static boolean disableVibrate() {
+        return Settings.DISABLE_HAPTIC_FEEDBACK_CHAPTERS.get()
+                && Settings.DISABLE_HAPTIC_FEEDBACK_PRECISE_SEEKING.get()
+                && Settings.DISABLE_HAPTIC_FEEDBACK_SEEK_UNDO.get()
+                && Settings.DISABLE_HAPTIC_FEEDBACK_TAP_AND_HOLD.get()
+                && Settings.DISABLE_HAPTIC_FEEDBACK_ZOOM.get();
     }
 
     // endregion
@@ -357,12 +383,6 @@ public class PlayerPatch {
 
     public static boolean hideCaptionsButton(boolean original) {
         return !Settings.HIDE_PLAYER_CAPTIONS_BUTTON.get() && original;
-    }
-
-    public static int hideCastButton(int original) {
-        return Settings.HIDE_PLAYER_CAST_BUTTON.get()
-                ? View.GONE
-                : original;
     }
 
     public static void hideCaptionsButton(View view) {
@@ -595,9 +615,7 @@ public class PlayerPatch {
     }
 
     public static float speedOverlayRelativeValue(float original) {
-        return SPEED_OVERLAY_VALUE != 2.0f
-                ? 0f
-                : original;
+        return Settings.DISABLE_SPEED_OVERLAY.get() ? original : 0f;
     }
 
     public static boolean hideChannelWatermark(boolean original) {
@@ -674,6 +692,33 @@ public class PlayerPatch {
 
     // region [Hide player flyout menu] patch
 
+    /**
+     * Advanced video quality bottom sheet body.
+     */
+    private static final String ADVANCED_VIDEO_QUALITY_BODY_PATH = "advanced_quality_sheet_content.e";
+    /**
+     * Advanced video quality bottom sheet header.
+     */
+    private static final String ADVANCED_VIDEO_QUALITY_HEADER_PATH = "quality_sheet_header.e";
+    /**
+     * Base video quality bottom sheet header.
+     */
+    private static final String BASE_VIDEO_QUALITY_HEADER_PATH = "quick_quality_sheet_content.e";
+    /**
+     * Captions bottom sheet body.
+     */
+    private static final String CAPTIONS_BODY_PATH = "captions_sheet_content.e";
+
+    private static final String ELEMENT_IDENTIFIER_COMPONENT = "ComponentType";
+    private static final String ELEMENT_IDENTIFIER_CONTAINER = "Container";
+
+    private static final String[] PLAYER_FLYOUT_QUALITY_HEADER_IDENTIFIERS = new String[]{
+            ADVANCED_VIDEO_QUALITY_HEADER_PATH,
+            BASE_VIDEO_QUALITY_HEADER_PATH,
+    };
+
+    private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
+
     public static VideoQuality[] hidePlayerFlyoutMenuEnhancedBitrate(VideoQuality[] videoQualities) {
         if (Settings.HIDE_PLAYER_FLYOUT_MENU_ENHANCED_BITRATE.get() &&
                 ArrayUtils.isNotEmpty(videoQualities)) {
@@ -689,11 +734,126 @@ public class PlayerPatch {
         return videoQualities;
     }
 
+    /**
+     * Injection point.
+     */
+    public static void hideNativeBottomSheetFooter(String path, List<Object> treeNodeResultList) {
+        boolean hideCaptionsFooter = Settings.HIDE_PLAYER_FLYOUT_MENU_CAPTIONS_FOOTER.get();
+        boolean hideQualityFooter = Settings.HIDE_PLAYER_FLYOUT_MENU_QUALITY_FOOTER.get();
+        if (!hideCaptionsFooter && !hideQualityFooter) {
+            return;
+        }
+
+        try {
+            int size = treeNodeResultList.size();
+            if (size <= 2) {
+                return;
+            }
+
+            if (path.startsWith(CAPTIONS_BODY_PATH) && hideCaptionsFooter) {
+                int i = 0;
+                for (Object object : treeNodeResultList) {
+                    if (!ELEMENT_IDENTIFIER_COMPONENT.equals(object.toString())) {
+                        if (i == size - 1 && ELEMENT_IDENTIFIER_CONTAINER.equals(object.toString())) {
+                            continue;
+                        }
+                        return;
+                    }
+                    i++;
+                }
+
+                treeNodeResultList.remove(size - 1);
+            } else if (path.startsWith(ADVANCED_VIDEO_QUALITY_BODY_PATH) && hideQualityFooter) {
+                for (Object object : treeNodeResultList) {
+                    if (!ELEMENT_IDENTIFIER_COMPONENT.equals(object.toString())) {
+                        return;
+                    }
+                }
+
+                treeNodeResultList.remove(size - 1);
+                treeNodeResultList.remove(size - 2);
+            }
+        } catch (Exception ex) {
+            Logger.printException(() -> "hideNativeBottomSheetFooter failure", ex);
+        }
+    }
+
+    /**
+     * Injection point.
+     */
+    public static byte[] hideNativeBottomSheetHeader(byte[] bytes) {
+        if (!Settings.HIDE_PLAYER_FLYOUT_MENU_QUALITY_HEADER.get()) {
+            return bytes;
+        }
+
+        try {
+            var newElement = NewElement.parseFrom(bytes).toBuilder();
+            var identifier = newElement.getProperties().getIdentifierProperties().getIdentifier();
+
+            if (Utils.containsAny(identifier, PLAYER_FLYOUT_QUALITY_HEADER_IDENTIFIERS)) {
+                var type = newElement.getType().toBuilder();
+                var componentType = type.getComponentType().toBuilder();
+                var model = componentType.getModel().toBuilder();
+                if (model.hasYoutubeModel()) {
+                    var youtubeModel = model.getYoutubeModel().toBuilder();
+                    var viewModel = youtubeModel.getViewModel().toBuilder();
+
+                    if (viewModel.hasQuickQualitySheetContentViewModel()) {
+                        var quickQualitySheetContentViewModel = viewModel
+                                .getQuickQualitySheetContentViewModel().toBuilder();
+
+                        quickQualitySheetContentViewModel.clearQualityHeader();
+
+                        var newQuickQualitySheetContentViewModel = quickQualitySheetContentViewModel.build();
+                        viewModel.clearQuickQualitySheetContentViewModel();
+                        viewModel.setQuickQualitySheetContentViewModel(newQuickQualitySheetContentViewModel);
+
+                        var newViewModel = viewModel.build();
+                        youtubeModel.clearViewModel();
+                        youtubeModel.setViewModel(newViewModel);
+
+                        var newYoutubeModel = youtubeModel.build();
+                        model.clearYoutubeModel();
+                        model.setYoutubeModel(newYoutubeModel);
+
+                        var newModel = model.build();
+                        componentType.clearModel();
+                        componentType.setModel(newModel);
+
+                        var newComponentType = componentType.build();
+                        type.clearComponentType();
+                        type.setComponentType(newComponentType);
+
+                        var newType = type.build();
+                        newElement.clearType();
+                        newElement.setType(newType);
+
+                        return newElement.build().toByteArray();
+                    } else if (viewModel.hasQualitySheetHeaderViewModel()) {
+                        return EMPTY_BYTE_ARRAY;
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            Logger.printException(() -> "hideNativeBottomSheetHeader failure", ex);
+        }
+
+        return bytes;
+    }
+
     public static void hidePlayerFlyoutMenuCaptionsFooter(View view) {
         Utils.hideViewUnderCondition(
                 Settings.HIDE_PLAYER_FLYOUT_MENU_CAPTIONS_FOOTER.get(),
                 view
         );
+    }
+
+    public static void hidePlayerFlyoutMenuCaptionsFooter(ListView listView, View view, Object object, boolean bool) {
+        if (Settings.HIDE_PLAYER_FLYOUT_MENU_CAPTIONS_FOOTER.get()) {
+            view = new View(listView.getContext());
+        }
+
+        listView.addFooterView(view, object, bool);
     }
 
     public static void hidePlayerFlyoutMenuQualityFooter(View view) {
@@ -703,16 +863,32 @@ public class PlayerPatch {
         );
     }
 
+    public static void hidePlayerFlyoutMenuQualityFooter(ListView listView, View view, Object object, boolean bool) {
+        if (Settings.HIDE_PLAYER_FLYOUT_MENU_QUALITY_FOOTER.get()) {
+            view = new View(listView.getContext());
+        }
+
+        listView.addFooterView(view, object, bool);
+    }
+
     public static View hidePlayerFlyoutMenuQualityHeader(View view) {
         return Settings.HIDE_PLAYER_FLYOUT_MENU_QUALITY_HEADER.get()
                 ? new View(view.getContext()) // empty view
                 : view;
     }
 
+    public static void hidePlayerFlyoutMenuQualityHeader(ListView listView, View view, Object object, boolean bool) {
+        if (Settings.HIDE_PLAYER_FLYOUT_MENU_QUALITY_HEADER.get()) {
+            view = new View(listView.getContext());
+        }
+
+        listView.addHeaderView(view, object, bool);
+    }
+
     /**
      * Overriding this values is possible only after the litho component has been loaded.
      * Otherwise, crash will occur.
-     * See {@link InitializationPatch#onCreate}.
+     * See {@link InitializationPatch#onGlobalConfigUpdated()}.
      *
      * @param original original value.
      * @return whether to enable PiP Mode in the player flyout menu.
@@ -728,7 +904,7 @@ public class PlayerPatch {
     /**
      * Overriding this values is possible only after the litho component has been loaded.
      * Otherwise, crash will occur.
-     * See {@link InitializationPatch#onCreate}.
+     * See {@link InitializationPatch#onGlobalConfigUpdated()}.
      *
      * @param original original value.
      * @return whether to enable Sleep timer Mode in the player flyout menu.
@@ -808,10 +984,6 @@ public class PlayerPatch {
         return Settings.ENABLE_SEEKBAR_TAPPING.get();
     }
 
-    public static boolean enableHighQualityFullscreenThumbnails() {
-        return Settings.RESTORE_OLD_SEEKBAR_THUMBNAILS.get();
-    }
-
     private static final int timeBarChapterViewId =
             ResourceUtils.getIdIdentifier("time_bar_chapter_title");
 
@@ -829,10 +1001,6 @@ public class PlayerPatch {
 
     public static boolean hideTimeStamp() {
         return Settings.HIDE_TIME_STAMP.get();
-    }
-
-    public static boolean restoreOldSeekbarThumbnails() {
-        return !Settings.RESTORE_OLD_SEEKBAR_THUMBNAILS.get();
     }
 
     // endregion

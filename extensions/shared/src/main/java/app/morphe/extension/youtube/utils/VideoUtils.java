@@ -4,7 +4,7 @@
  * This file is part of the revanced-patches project:
  * https://github.com/anddea/revanced-patches
  *
- * Original author(s) (alphabetical order):
+ * Original author(s):
  * - anddea (https://github.com/anddea)
  * - inotia00 (https://github.com/inotia00)
  * - Jav1x (https://github.com/Jav1x)
@@ -44,7 +44,6 @@ package app.morphe.extension.youtube.utils;
 
 import static app.morphe.extension.shared.utils.BaseThemeUtils.getDialogBackgroundColor;
 import static app.morphe.extension.shared.utils.ResourceUtils.getString;
-import static app.morphe.extension.shared.utils.ResourceUtils.getStringArray;
 import static app.morphe.extension.shared.utils.StringRef.str;
 import static app.morphe.extension.shared.utils.Utils.dipToPixels;
 import static app.morphe.extension.youtube.patches.video.CustomPlaybackSpeedPatch.PLAYBACK_SPEED_MAXIMUM;
@@ -85,6 +84,7 @@ import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -115,13 +115,12 @@ import app.morphe.extension.shared.utils.IntentUtils;
 import app.morphe.extension.shared.utils.Logger;
 import app.morphe.extension.shared.utils.ResourceUtils;
 import app.morphe.extension.shared.utils.Utils;
-import app.morphe.extension.youtube.patches.shorts.ShortsRepeatStatePatch.ShortsLoopBehavior;
 import app.morphe.extension.youtube.patches.video.CustomPlaybackSpeedPatch;
 import app.morphe.extension.youtube.patches.video.CustomPlaybackSpeedPatch.PlaybackSpeedMenuType;
 import app.morphe.extension.youtube.patches.video.PlaybackSpeedPatch;
-import app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch;
 import app.morphe.extension.youtube.patches.video.VideoQualityPatch;
 import app.morphe.extension.youtube.patches.video.VideoQualityPatch.VideoQualityMenuInterface;
+import app.morphe.extension.youtube.patches.voiceovertranslation.VoiceOverTranslationPatch;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.settings.preference.ExternalDownloaderPlaylistPreference;
 import app.morphe.extension.youtube.settings.preference.ExternalDownloaderVideoLongPressPreference;
@@ -177,7 +176,7 @@ public class VideoUtils extends IntentUtils {
         builder.append(videoId);
         final long currentVideoTimeInSeconds = VideoInformation.getVideoTimeInSeconds();
         if (withTimestamp && currentVideoTimeInSeconds > 0) {
-            builder.append("?t=");
+            builder.append(builder.indexOf("?") >= 0 ? "&t=" : "?t=");
             builder.append(currentVideoTimeInSeconds);
         }
         return builder.toString();
@@ -403,36 +402,6 @@ public class VideoUtils extends IntentUtils {
             case CUSTOM_LEGACY -> showCustomLegacyPlaybackSpeedDialog(context);
             case CUSTOM_MODERN -> showCustomModernPlaybackSpeedDialog(context);
         }
-    }
-
-    public static void showShortsRepeatDialog(@NonNull Context context) {
-        final EnumSetting<ShortsLoopBehavior> setting = Settings.CHANGE_SHORTS_REPEAT_STATE;
-        final String settingsKey = setting.key;
-
-        final String entryKey = settingsKey + "_entries";
-        final String entryValueKey = settingsKey + "_entry_values";
-        final String[] mEntries = getStringArray(entryKey);
-        final String[] mEntryValues = getStringArray(entryValueKey);
-
-        LinearLayout mainLayout = ExtendedUtils.prepareMainLayout(context);
-        Map<LinearLayout, Runnable> actionsMap = new LinkedHashMap<>(mEntryValues.length);
-        String currentValue = setting.get().name();
-        int checkIconId = ResourceUtils.getDrawableIdentifier("quantum_ic_check_white_24");
-
-        for (int i = 0; i < mEntryValues.length; i++) {
-            String label = mEntries[i];
-            String enumValue = mEntryValues[i];
-
-            int index = i;
-            Runnable action = () -> {
-                for (ShortsLoopBehavior behavior : ShortsLoopBehavior.values())
-                    if (behavior.ordinal() == index) setting.save(behavior);
-            };
-            LinearLayout itemLayout = ExtendedUtils.createItemLayout(context, label, currentValue.equals(enumValue) ? checkIconId : 0);
-            actionsMap.putIfAbsent(itemLayout, action);
-            mainLayout.addView(itemLayout);
-        }
-        ExtendedUtils.showBottomSheetDialog(context, mainLayout, actionsMap);
     }
 
     public static String getFormattedQualityString(@Nullable String prefix) {
@@ -922,69 +891,71 @@ public class VideoUtils extends IntentUtils {
             gridParams.setMargins(dip4, dip12, dip4, dip12); // Speed buttons container.
             gridLayout.setLayoutParams(gridParams);
 
-            // For button use 1 digit minimum.
-            speedFormatter.setMinimumFractionDigits(1);
+            synchronized (speedFormatter) {
+                // For button use 1 digit minimum.
+                speedFormatter.setMinimumFractionDigits(1);
 
-            // Add buttons for each preset playback speed.
-            for (float speed : CustomPlaybackSpeedPatch.getPlaybackSpeeds()) {
-                // Container for button and optional label.
-                FrameLayout buttonContainer = new FrameLayout(context);
+                // Add buttons for each preset playback speed.
+                for (float speed : CustomPlaybackSpeedPatch.getPlaybackSpeeds()) {
+                    // Container for button and optional label.
+                    FrameLayout buttonContainer = new FrameLayout(context);
 
-                // Set layout parameters for each grid cell.
-                GridLayout.LayoutParams containerParams = new GridLayout.LayoutParams();
-                containerParams.width = 0; // Equal width for columns.
-                containerParams.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1, 1f);
-                containerParams.setMargins(dip4, 0, dip4, 0); // Button margins.
-                containerParams.height = dip60; // Fixed height for button and label.
-                buttonContainer.setLayoutParams(containerParams);
+                    // Set layout parameters for each grid cell.
+                    GridLayout.LayoutParams containerParams = new GridLayout.LayoutParams();
+                    containerParams.width = 0; // Equal width for columns.
+                    containerParams.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1, 1f);
+                    containerParams.setMargins(dip4, 0, dip4, 0); // Button margins.
+                    containerParams.height = dip60; // Fixed height for button and label.
+                    buttonContainer.setLayoutParams(containerParams);
 
-                // Create speed button.
-                Button speedButton = new Button(context, null, 0);
-                speedButton.setText(speedFormatter.format(speed));
-                speedButton.setTextColor(ThemeUtils.getAppForegroundColor());
-                speedButton.setTextSize(12);
-                speedButton.setAllCaps(false);
-                speedButton.setGravity(Gravity.CENTER);
+                    // Create speed button.
+                    Button speedButton = new Button(context, null, 0);
+                    speedButton.setText(speedFormatter.format(speed));
+                    speedButton.setTextColor(ThemeUtils.getAppForegroundColor());
+                    speedButton.setTextSize(12);
+                    speedButton.setAllCaps(false);
+                    speedButton.setGravity(Gravity.CENTER);
 
-                ShapeDrawable buttonBackground = new ShapeDrawable(new RoundRectShape(
-                        Utils.createCornerRadii(20), null, null));
-                buttonBackground.getPaint().setColor(getAdjustedBackgroundColor(false));
-                speedButton.setBackground(buttonBackground);
-                speedButton.setPadding(dip4, dip4, dip4, dip4);
+                    ShapeDrawable buttonBackground = new ShapeDrawable(new RoundRectShape(
+                            Utils.createCornerRadii(20), null, null));
+                    buttonBackground.getPaint().setColor(getAdjustedBackgroundColor(false));
+                    speedButton.setBackground(buttonBackground);
+                    speedButton.setPadding(dip4, dip4, dip4, dip4);
 
-                // Center button vertically and stretch horizontally in container.
-                FrameLayout.LayoutParams buttonParams = new FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT, dip32, Gravity.CENTER);
-                speedButton.setLayoutParams(buttonParams);
+                    // Center button vertically and stretch horizontally in container.
+                    FrameLayout.LayoutParams buttonParams = new FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.MATCH_PARENT, dip32, Gravity.CENTER);
+                    speedButton.setLayoutParams(buttonParams);
 
-                // Add speed buttons view to buttons container layout.
-                buttonContainer.addView(speedButton);
+                    // Add speed buttons view to buttons container layout.
+                    buttonContainer.addView(speedButton);
 
-                // Add "Normal" label for 1.0x speed.
-                if (speed == 1.0f) {
-                    TextView normalLabel = new TextView(context);
-                    // Use same 'Normal' string as stock YouTube.
-                    normalLabel.setText(str("revanced_playback_speed_normal"));
-                    normalLabel.setTextColor(ThemeUtils.getAppForegroundColor());
-                    normalLabel.setTextSize(10);
-                    normalLabel.setGravity(Gravity.CENTER);
+                    // Add "Normal" label for 1.0x speed.
+                    if (speed == 1.0f) {
+                        TextView normalLabel = new TextView(context);
+                        // Use same 'Normal' string as stock YouTube.
+                        normalLabel.setText(str("revanced_playback_speed_normal"));
+                        normalLabel.setTextColor(ThemeUtils.getAppForegroundColor());
+                        normalLabel.setTextSize(10);
+                        normalLabel.setGravity(Gravity.CENTER);
 
-                    FrameLayout.LayoutParams labelParams = new FrameLayout.LayoutParams(
-                            FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
-                            Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-                    labelParams.bottomMargin = 0; // Position label below button.
-                    normalLabel.setLayoutParams(labelParams);
+                        FrameLayout.LayoutParams labelParams = new FrameLayout.LayoutParams(
+                                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+                        labelParams.bottomMargin = 0; // Position label below button.
+                        normalLabel.setLayoutParams(labelParams);
 
-                    buttonContainer.addView(normalLabel);
+                        buttonContainer.addView(normalLabel);
+                    }
+
+                    speedButton.setOnClickListener(v -> userSelectedSpeed.apply(speed));
+
+                    gridLayout.addView(buttonContainer);
                 }
 
-                speedButton.setOnClickListener(v -> userSelectedSpeed.apply(speed));
-
-                gridLayout.addView(buttonContainer);
+                // Restore 2 digit minimum.
+                speedFormatter.setMinimumFractionDigits(2);
             }
-
-            // Restore 2 digit minimum.
-            speedFormatter.setMinimumFractionDigits(2);
 
             // Add in-rows speed buttons layout to main layout.
             mainLayout.addView(gridLayout);
@@ -1007,9 +978,14 @@ public class VideoUtils extends IntentUtils {
             final int dip4 = dipToPixels(4);
             final int dip8 = dipToPixels(8);
             final int dip12 = dipToPixels(12);
+            final int dip16 = dipToPixels(16);
             final int dip20 = dipToPixels(20);
 
-            // Title: "Громкость перевода"
+            if (VoiceOverTranslationPatch.isTranslationRequestInProgress()) {
+                mainLayout.addView(createVotProgressStatus(context));
+            }
+
+            // Translation volume
             TextView titleText = new TextView(context);
             titleText.setText(str("revanced_vot_translation_volume_title"));
             titleText.setTextColor(ThemeUtils.getAppForegroundColor());
@@ -1018,17 +994,29 @@ public class VideoUtils extends IntentUtils {
             titleText.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            titleParams.setMargins(0, dip20, 0, dip12);
+            titleParams.setMargins(0, dip20, 0, dip4);
             titleText.setLayoutParams(titleParams);
             mainLayout.addView(titleText);
+
+            TextView volumeValueText = new TextView(context);
+            volumeValueText.setText(str("revanced_vot_percent_value", Settings.VOT_TRANSLATION_VOLUME.get()));
+            volumeValueText.setTextColor(ThemeUtils.getAppForegroundColor());
+            volumeValueText.setTextSize(14);
+            volumeValueText.setIncludeFontPadding(false);
+            volumeValueText.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams volumeValueParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            volumeValueParams.setMargins(0, 0, 0, 0);
+            volumeValueText.setLayoutParams(volumeValueParams);
+            mainLayout.addView(volumeValueText);
 
             // Slider row with -/+ buttons
             LinearLayout sliderLayout = new LinearLayout(context);
             sliderLayout.setOrientation(LinearLayout.HORIZONTAL);
             sliderLayout.setGravity(Gravity.CENTER_VERTICAL);
 
-            Button minusButton = createStyledButton(context, false, dip8, dip8);
-            Button plusButton = createStyledButton(context, true, dip8, dip8);
+            Button minusButton = createStyledButton(context, false, dip16, dip4);
+            Button plusButton = createStyledButton(context, true, dip4, dip16);
 
             SeekBar volumeSlider = new SeekBar(context);
             volumeSlider.setFocusable(true);
@@ -1043,16 +1031,9 @@ public class VideoUtils extends IntentUtils {
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
             volumeSlider.setLayoutParams(sliderParams);
 
-            TextView volumeValueText = new TextView(context);
-            volumeValueText.setText(str("revanced_vot_percent_value", Settings.VOT_TRANSLATION_VOLUME.get()));
-            volumeValueText.setTextColor(ThemeUtils.getAppForegroundColor());
-            volumeValueText.setTextSize(14);
-            volumeValueText.setMinWidth(dipToPixels(40));
-
             sliderLayout.addView(minusButton);
             sliderLayout.addView(volumeSlider);
             sliderLayout.addView(plusButton);
-            sliderLayout.addView(volumeValueText);
 
             mainLayout.addView(sliderLayout);
 
@@ -1089,16 +1070,28 @@ public class VideoUtils extends IntentUtils {
             origTitleText.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams origTitleParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            origTitleParams.setMargins(0, dip20, 0, dip12);
+            origTitleParams.setMargins(0, dip20, 0, dip4);
             origTitleText.setLayoutParams(origTitleParams);
             mainLayout.addView(origTitleText);
+
+            TextView origVolumeValueText = new TextView(context);
+            origVolumeValueText.setText(str("revanced_vot_percent_value", Settings.VOT_ORIGINAL_AUDIO_VOLUME.get()));
+            origVolumeValueText.setTextColor(ThemeUtils.getAppForegroundColor());
+            origVolumeValueText.setTextSize(14);
+            origVolumeValueText.setIncludeFontPadding(false);
+            origVolumeValueText.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams origVolumeValueParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            origVolumeValueParams.setMargins(0, 0, 0, 0);
+            origVolumeValueText.setLayoutParams(origVolumeValueParams);
+            mainLayout.addView(origVolumeValueText);
 
             LinearLayout origSliderLayout = new LinearLayout(context);
             origSliderLayout.setOrientation(LinearLayout.HORIZONTAL);
             origSliderLayout.setGravity(Gravity.CENTER_VERTICAL);
 
-            Button origMinusButton = createStyledButton(context, false, dip8, dip8);
-            Button origPlusButton = createStyledButton(context, true, dip8, dip8);
+            Button origMinusButton = createStyledButton(context, false, dip16, dip4);
+            Button origPlusButton = createStyledButton(context, true, dip4, dip16);
 
             SeekBar origVolumeSlider = new SeekBar(context);
             origVolumeSlider.setFocusable(true);
@@ -1113,16 +1106,9 @@ public class VideoUtils extends IntentUtils {
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
             origVolumeSlider.setLayoutParams(origSliderParams);
 
-            TextView origVolumeValueText = new TextView(context);
-            origVolumeValueText.setText(str("revanced_vot_percent_value", Settings.VOT_ORIGINAL_AUDIO_VOLUME.get()));
-            origVolumeValueText.setTextColor(ThemeUtils.getAppForegroundColor());
-            origVolumeValueText.setTextSize(14);
-            origVolumeValueText.setMinWidth(dipToPixels(40));
-
             origSliderLayout.addView(origMinusButton);
             origSliderLayout.addView(origVolumeSlider);
             origSliderLayout.addView(origPlusButton);
-            origSliderLayout.addView(origVolumeValueText);
 
             mainLayout.addView(origSliderLayout);
 
@@ -1165,6 +1151,61 @@ public class VideoUtils extends IntentUtils {
         } catch (Exception ex) {
             Logger.printException(() -> "showVotBottomSheetDialog failure", ex);
         }
+    }
+
+    private static LinearLayout createVotProgressStatus(Context context) {
+        final int dip8 = dipToPixels(8);
+        final int dip12 = dipToPixels(12);
+        final int dip16 = dipToPixels(16);
+        final int dip32 = dipToPixels(32);
+
+        LinearLayout container = new LinearLayout(context);
+        container.setOrientation(LinearLayout.HORIZONTAL);
+        container.setGravity(Gravity.CENTER);
+        container.setPadding(dip16, dip8, dip16, dip12);
+
+        ProgressBar progressBar = new ProgressBar(context, null, android.R.attr.progressBarStyleSmall);
+        progressBar.setIndeterminate(true);
+        if (progressBar.getIndeterminateDrawable() != null) {
+            progressBar.getIndeterminateDrawable().setColorFilter(
+                    ThemeUtils.getAppForegroundColor(), PorterDuff.Mode.SRC_IN);
+        }
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(dip32, dip32);
+        progressParams.setMargins(0, 0, dip12, 0);
+        container.addView(progressBar, progressParams);
+
+        TextView progressText = new TextView(context);
+        progressText.setTextColor(ThemeUtils.getAppForegroundColor());
+        progressText.setTextSize(14);
+        progressText.setTypeface(Typeface.DEFAULT_BOLD);
+        progressText.setGravity(Gravity.CENTER);
+        container.addView(progressText, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        final Runnable[] updateProgress = new Runnable[1];
+        updateProgress[0] = () -> {
+            String status = VoiceOverTranslationPatch.getTranslationRequestStatusText();
+            boolean visible = !status.isEmpty();
+            container.setVisibility(visible ? View.VISIBLE : View.GONE);
+            progressText.setText(status);
+            if (visible && container.getWindowToken() != null) {
+                container.postDelayed(updateProgress[0], 1000);
+            }
+        };
+
+        container.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(@NonNull View v) {
+                updateProgress[0].run();
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(@NonNull View v) {
+                container.removeCallbacks(updateProgress[0]);
+            }
+        });
+        updateProgress[0].run();
+        return container;
     }
 
     /**
@@ -1328,7 +1369,9 @@ public class VideoUtils extends IntentUtils {
      * @return A string representation of the speed with 'x' (e.g. "1.25x" or "1.00x").
      */
     private static String formatSpeedStringX(float speed) {
-        return speedFormatter.format(speed) + 'x';
+        synchronized (speedFormatter) {
+            return speedFormatter.format(speed) + 'x';
+        }
     }
 
     /**
@@ -1336,8 +1379,10 @@ public class VideoUtils extends IntentUtils {
      * @return A string representation of the speed with 'x' (e.g. "1.25x" or "1.00x").
      */
     public static String formatSpeedStringX(float speed, int minimumFractionDigits) {
-        speedFormatter.setMinimumFractionDigits(minimumFractionDigits);
-        return speedFormatter.format(speed) + 'x';
+        synchronized (speedFormatter) {
+            speedFormatter.setMinimumFractionDigits(minimumFractionDigits);
+            return speedFormatter.format(speed) + 'x';
+        }
     }
 
     /**

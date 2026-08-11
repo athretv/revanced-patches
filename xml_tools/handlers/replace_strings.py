@@ -1,3 +1,5 @@
+# Copyright (C) 2026 anddea
+
 """Module for updating XML strings from source to target files."""
 
 from __future__ import annotations
@@ -14,12 +16,42 @@ from utils.xml_processor import XMLProcessor
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from xml.etree import ElementTree as ET
 
 logger = logging.getLogger("xml_tools")
 
 
+def _replace_morphe_brand_text(element: ET.Element) -> bool:
+    """Replace Morphe branding only inside string text nodes."""
+    changed = False
+    for node in element.iter():
+        if node.text and "Morphe" in node.text:
+            node.text = node.text.replace("Morphe", "RVX")
+            changed = True
+        if node.tail and "Morphe" in node.tail:
+            node.tail = node.tail.replace("Morphe", "RVX")
+            changed = True
+
+    return changed
+
+
+def replace_morphe_brand_text_in_file(path: Path) -> None:
+    """Replace Morphe branding in an existing strings.xml file."""
+    _, root, _ = XMLProcessor.parse_file(path)
+    if root is None:
+        return
+
+    changed = False
+    for elem in root.findall(".//string"):
+        changed = _replace_morphe_brand_text(elem) or changed
+
+    if changed:
+        XMLProcessor.write_file(path, root)
+        logger.debug("Updated Morphe branding in %s", path)
+
+
 def _find_source_translation_files(source_base_path: Path, lang_code: str, app: str) -> list[Path]:
-    """Find source translation files for the app and the shared-youtube directory.
+    """Find source translation files for the app, shared, and shared-youtube directories.
 
     Matches 'ar' to 'values-ar-rSA', 'in' to 'values-in', etc.
 
@@ -44,15 +76,24 @@ def _find_source_translation_files(source_base_path: Path, lang_code: str, app: 
         if app_file.exists():
             found_paths.append(app_file)
 
-        # Check for shared-youtube strings
-        shared_file = matching_dir / "shared-youtube/strings.xml"
+        # Check for shared strings
+        shared_file = matching_dir / "shared/strings.xml"
         if shared_file.exists():
             found_paths.append(shared_file)
+
+        # Check for shared-youtube strings
+        shared_yt_file = matching_dir / "shared-youtube/strings.xml"
+        if shared_yt_file.exists():
+            found_paths.append(shared_yt_file)
 
     return found_paths
 
 
-def update_strings(target_path: Path, source_path: Path, filter_keys: set[str] | None = None) -> None:
+def update_strings(
+    target_path: Path,
+    source_path: Path,
+    filter_keys: set[str] | None = None,
+) -> None:
     """Update target XML file with strings from source file.
 
     Args:
@@ -85,27 +126,36 @@ def update_strings(target_path: Path, source_path: Path, filter_keys: set[str] |
         }
 
         # Update existing strings or add new ones
-        for name, data in source_strings.items():
-            if name in blacklist:
-                continue  # Skip blacklisted strings
+        for original_name, data in source_strings.items():
+            names_to_process = [original_name]
 
-            # Apply filter if provided
-            if filter_keys is not None and name not in filter_keys:
+            # Always add a copy of the string renamed to 'revanced' if applicable
+            if original_name.startswith("morphe_"):
+                names_to_process.append("revanced_" + original_name[7:])
+
+            # Skip if any of the derived names are blacklisted
+            if any(name in blacklist for name in names_to_process):
                 continue
 
-            # Parse the new element once if we need it
-            new_elem: Any = DefusedET.fromstring(data["text"])
+            # Apply filter if provided
+            if filter_keys is not None and not any(name in filter_keys for name in names_to_process):
+                continue
 
-            if name in existing_elements:
-                existing_elem: Any = existing_elements[name]
-                # Replace attributes and children
-                existing_elem.attrib.clear()
-                existing_elem.attrib.update(new_elem.attrib)
-                existing_elem[:] = new_elem[:]
-                existing_elem.text = new_elem.text
-                existing_elem.tail = new_elem.tail
-            elif name not in blacklist and (filter_keys is None or name in filter_keys):
-                target_root.append(new_elem)
+            for name in names_to_process:
+                new_elem: Any = DefusedET.fromstring(data["text"])
+                new_elem.set("name", name)
+                _replace_morphe_brand_text(new_elem)
+
+                if name in existing_elements:
+                    existing_elem: Any = existing_elements[name]
+                    # Replace attributes and children
+                    existing_elem.attrib.clear()
+                    existing_elem.attrib.update(new_elem.attrib)
+                    existing_elem[:] = new_elem[:]
+                    existing_elem.text = new_elem.text
+                    existing_elem.tail = new_elem.tail
+                else:
+                    target_root.append(new_elem)
 
         # Write updated file
         XMLProcessor.write_file(target_path, target_root)
@@ -121,6 +171,7 @@ def update_base_strings(base_path: Path, rvx_base_path: Path) -> None:
     rvx_source_path = rvx_base_path / "settings/host/values/strings.xml"
     if rvx_source_path.exists():
         update_strings(source_path, rvx_source_path)
+    replace_morphe_brand_text_in_file(source_path)
 
 
 def sync_translations(translations_path: Path, rvx_base_path: Path) -> None:
@@ -156,6 +207,8 @@ def update_translations_with_keys(
 ) -> None:
     """Update translation strings with specific keys."""
     source_base_path = base_dir / "src/main/resources/addresources"
+    if not source_base_path.exists():
+        source_base_path = base_dir / "patches/src/main/resources/addresources"
 
     for lang_dir in translations_path.iterdir():
         if not lang_dir.is_dir():
@@ -186,6 +239,8 @@ def process(app: str, base_dir: Path) -> None:
     base_path = settings.get_resource_path(app, "settings")
     translations_path = settings.get_resource_path(app, "translations")
     rvx_base_path = base_dir / "src/main/resources" / app
+
+    is_morphe = "morphe-patches" in str(base_dir)
 
     # Update base strings file
     update_base_strings(base_path, rvx_base_path)
@@ -245,7 +300,7 @@ def process(app: str, base_dir: Path) -> None:
     #     "revanced_swipe_text_overlay_size_title",
     # }
 
-    if "morphe-patches" in str(base_dir):
+    if is_morphe:
         update_translations_with_keys(translations_path, base_dir, app)
         # update_translations_with_keys(translations_path, base_dir, app, additional_keys)
     else:

@@ -3,17 +3,13 @@ package app.morphe.extension.youtube.patches.utils;
 import app.morphe.extension.shared.utils.Utils;
 
 public class PatchStatus {
-    public static final String SPOOF_APP_VERSION_TARGET_DEFAULT_VALUE = "19.01.34";
+    public static final String SPOOF_APP_VERSION_TARGET_DEFAULT_VALUE = "20.05.46";
 
     public static boolean ImageSearchButton() {
         // Replace this with true if the 'Hide image search buttons' patch succeeds
         return false;
     }
 
-    // Modified by a patch. Do not touch.
-    public static boolean OldSeekbarThumbnailsDefaultBoolean() {
-        return false;
-    }
 
     public static boolean OldSplashAnimation() {
         // Replace this with true if the 'Restore old splash animation (Custom branding icon)' succeeds
@@ -58,6 +54,11 @@ public class PatchStatus {
 
     public static boolean SpoofAppVersion() {
         // Replace this with true if the 'Spoof app version' patch succeeds
+        return false;
+    }
+
+    // Modified by a patch. Do not touch.
+    public static boolean SpoofAppVersionDefaultBoolean() {
         return false;
     }
 

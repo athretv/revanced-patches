@@ -2,7 +2,6 @@ package app.morphe.extension.youtube.settings.preference;
 
 import static app.morphe.extension.shared.patches.PatchStatus.PatchVersion;
 import static app.morphe.extension.shared.patches.PatchStatus.PatchedTime;
-import static app.morphe.extension.shared.utils.StringRef.str;
 import static app.morphe.extension.youtube.settings.Settings.HIDE_PREVIEW_COMMENT;
 import static app.morphe.extension.youtube.settings.Settings.HIDE_PREVIEW_COMMENT_TYPE;
 
@@ -13,6 +12,8 @@ import android.preference.Preference;
 import android.preference.PreferenceScreen;
 import android.preference.SwitchPreference;
 import android.widget.Toolbar;
+
+import androidx.annotation.NonNull;
 
 import java.util.Date;
 
@@ -92,6 +93,20 @@ public class YouTubePreferenceFragment extends ToolbarPreferenceFragment {
         } catch (Exception ex) {
             Logger.printException(() -> "initialize failure", ex);
         }
+    }
+
+    @Override
+    protected void syncSettingWithPreference(@NonNull Preference pref,
+                                             @NonNull Setting<?> setting,
+                                             boolean applySettingToPreference) {
+        if (pref instanceof VotOAuthPreference votOAuthPreference && setting == Settings.VOT_OAUTH_TOKEN) {
+            if (applySettingToPreference) {
+                votOAuthPreference.updateUI();
+            }
+            return;
+        }
+
+        super.syncSettingWithPreference(pref, setting, applySettingToPreference);
     }
 
     /**
@@ -267,9 +282,6 @@ public class YouTubePreferenceFragment extends ToolbarPreferenceFragment {
         if (!(findPreference(Settings.RYD_ENABLED.key) instanceof SwitchPreference enabledPreference)) {
             return;
         }
-        if (!(findPreference(Settings.RYD_SHORTS.key) instanceof SwitchPreference shortsPreference)) {
-            return;
-        }
         if (!(findPreference(Settings.RYD_DISLIKE_PERCENTAGE.key) instanceof SwitchPreference percentagePreference)) {
             return;
         }
@@ -286,10 +298,6 @@ public class YouTubePreferenceFragment extends ToolbarPreferenceFragment {
 
             return true;
         });
-        String shortsSummary = ReturnYouTubeDislikePatch.IS_SPOOFING_TO_NON_LITHO_SHORTS_PLAYER
-                ? str("revanced_ryd_shorts_summary_on")
-                : str("revanced_ryd_shorts_summary_on_disclaimer");
-        shortsPreference.setSummaryOn(shortsSummary);
         percentagePreference.setOnPreferenceChangeListener(clearAllUICaches);
         compactLayoutPreference.setOnPreferenceChangeListener(clearAllUICaches);
     }

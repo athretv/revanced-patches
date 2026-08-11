@@ -7,6 +7,8 @@ import app.morphe.extension.shared.settings.BaseSettings
 import app.morphe.extension.shared.utils.PackageUtils
 import org.apache.commons.lang3.ArrayUtils
 import java.util.Locale
+import app.morphe.extension.music.settings.Settings as MusicSettings
+import app.morphe.extension.youtube.settings.Settings as YouTubeSettings
 
 /**
  * Used to fetch streaming data.
@@ -257,7 +259,7 @@ object YouTubeClient {
         "$packageName/$clientVersion(Linux; U; Android $osVersion; ${Locale.getDefault()}; $deviceModel Build/$buildId) gzip"
 
     private fun useAV1(): Boolean {
-        return BaseSettings.SPOOF_STREAMING_DATA_ANDROID_VR_ENABLE_AV1_CODEC.get()
+        return YouTubeSettings.SPOOF_VIDEO_STREAMS_AV1.get()
     }
 
     private fun useJS(): Boolean {
@@ -291,7 +293,11 @@ object YouTubeClient {
             }
             return clientToUse.filterNotNull().toTypedArray()
         } else {
-            BaseSettings.SPOOF_STREAMING_DATA_DEFAULT_CLIENT.resetToDefault()
+            if (IS_YOUTUBE) {
+                YouTubeSettings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.resetToDefault()
+            } else {
+                MusicSettings.SPOOF_VIDEO_STREAMS_CLIENT_TYPE.resetToDefault()
+            }
             return availableClientTypes
         }
     }

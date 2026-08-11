@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 anddea
+ * Copyright (C) 2025-2026 anddea
  *
  * This file is part of the revanced-patches project:
  * https://github.com/anddea/revanced-patches
@@ -10,7 +10,7 @@
  * Licensed under the GNU General Public License v3.0.
  *
  * ------------------------------------------------------------------------
- * GPLv3 Section 7 – Attribution Notice
+ * GPLv3 Section 7 – Additional Terms & Attribution Requirements
  * ------------------------------------------------------------------------
  *
  * This file contains substantial original work by the author(s) listed above.
@@ -18,54 +18,80 @@
  * In accordance with Section 7 of the GNU General Public License v3.0,
  * the following additional terms apply to this file:
  *
- * 1. Attribution (Section 7(b)): This specific copyright notice and the
- *    list of original authors above must be preserved in any copy or
- *    derivative work. You may add your own copyright notice below it,
+ * 1. Source Credit Preservation (Section 7(b)): This specific copyright notice
+ *    and the list of original authors above must be preserved in any copy
+ *    or derivative work. You may add your own copyright notice below it,
  *    but you may not remove the original one.
  *
- * 2. Origin (Section 7(c)): Modified versions must be clearly marked as
- *    such (e.g., by adding a "Modified by" line or a new copyright notice).
- *    They must not be misrepresented as the original work.
+ * 2. Origin & Modification Marking (Section 7(c)): Modified versions must be
+ *    clearly marked as such (e.g., by adding a "Modified by" line or a new
+ *    copyright notice) and must not be misrepresented as the original work.
  *
- * ------------------------------------------------------------------------
- * Version Control Acknowledgement (Non-binding Request)
- * ------------------------------------------------------------------------
+ * 3. Version Control Attribution (Section 7(b)): Any ports or substantial
+ *    modifications must retain historical authorship credit in version control
+ *    systems (e.g., Git), listing original author(s) appropriately and
+ *    modifiers as committers or co-authors.
  *
- * While not a legal requirement of the GPLv3, the original author(s)
- * respectfully request that ports or substantial modifications retain
- * historical authorship credit in version control systems (e.g., Git),
- * listing original author(s) appropriately and modifiers as committers
- * or co-authors.
+ * 4. User Interface Attribution (Section 7(b)): Any works containing or
+ *    derived from this material must maintain a visible credit or
+ *    acknowledgment to the original author(s) within the application's
+ *    user interface (e.g., in an "About" or "Credits" section).
  */
 
 package app.morphe.extension.youtube.utils;
+
+import static app.morphe.extension.shared.utils.StringRef.str;
+import static app.morphe.extension.youtube.shared.VideoInformation.getVideoTitle;
 
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Pair;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import app.morphe.extension.shared.utils.Logger;
-import okhttp3.*;
+
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-import static app.morphe.extension.shared.utils.StringRef.str;
-import static app.morphe.extension.youtube.shared.VideoInformation.getVideoTitle;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+import app.morphe.extension.shared.utils.Logger;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.Headers;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 /**
  * Utility class for interacting with Yandex API to fetch and process video subtitles.
@@ -900,7 +926,232 @@ public class YandexVotUtils {
         }
 
         Logger.printDebug(() -> "VOT: Parsed " + map.size() + " subtitle entries");
-        return map.isEmpty() && subsArray.length() > 0 ? null : map;
+        if (map.isEmpty() && subsArray.length() > 0) {
+            return null;
+        }
+        return splitLongSubtitleEntries(map);
+    }
+
+    private static final double SUBTITLE_TARGET_MAX_WEIGHT = 70.0;
+    private static final long SUBTITLE_MIN_CHUNK_DURATION_MS = 300L;
+
+    /**
+     * Splits long subtitle entries into smaller word/character chunks with interpolated timestamps
+     * to prevent long sentences from blocking the video player UI.
+     *
+     * @param map The original parsed subtitle map.
+     * @return A new {@link TreeMap} containing split subtitle entries.
+     */
+    @Nullable
+    public static TreeMap<Long, Pair<Long, String>> splitLongSubtitleEntries(@Nullable TreeMap<Long, Pair<Long, String>> map) {
+        if (map == null || map.isEmpty()) {
+            return map;
+        }
+
+        TreeMap<Long, Pair<Long, String>> result = new TreeMap<>();
+        for (Map.Entry<Long, Pair<Long, String>> entry : map.entrySet()) {
+            long startMs = entry.getKey();
+            Pair<Long, String> pair = entry.getValue();
+            if (pair == null) continue;
+
+            long endMs = pair.first;
+            String text = pair.second;
+
+            if (TextUtils.isEmpty(text) || endMs <= startMs) {
+                putUniqueSubtitleEntry(result, startMs, endMs, text);
+                continue;
+            }
+
+            // Normalize spaces/newlines in subtitle text
+            String normalizedText = text.replaceAll("\\r?\\n", " ").trim();
+            if (getSubtitleTextWeight(normalizedText) <= SUBTITLE_TARGET_MAX_WEIGHT) {
+                putUniqueSubtitleEntry(result, startMs, endMs, normalizedText);
+                continue;
+            }
+
+            List<String> chunks = chunkSubtitleText(normalizedText);
+            if (chunks.isEmpty()) {
+                putUniqueSubtitleEntry(result, startMs, endMs, normalizedText);
+                continue;
+            }
+
+            int n = chunks.size();
+            if (n == 1) {
+                putUniqueSubtitleEntry(result, startMs, endMs, chunks.get(0));
+                continue;
+            }
+
+            double totalWeight = 0;
+            for (String chunk : chunks) {
+                totalWeight += getSubtitleTextWeight(chunk);
+            }
+            if (totalWeight <= 0) {
+                totalWeight = 1.0;
+            }
+
+            long totalDuration = endMs - startMs;
+            long currentStart = startMs;
+
+            for (int i = 0; i < n; i++) {
+                String chunkText = chunks.get(i);
+                long chunkEnd;
+                if (i == n - 1) {
+                    chunkEnd = endMs;
+                } else {
+                    double ratio = getSubtitleTextWeight(chunkText) / totalWeight;
+                    long duration = Math.max(SUBTITLE_MIN_CHUNK_DURATION_MS, Math.round(totalDuration * ratio));
+                    long maxAllowedEnd = endMs - (n - 1 - i) * SUBTITLE_MIN_CHUNK_DURATION_MS;
+                    chunkEnd = currentStart + duration;
+                    if (chunkEnd > maxAllowedEnd) {
+                        chunkEnd = maxAllowedEnd;
+                    }
+                }
+
+                if (chunkEnd <= currentStart) {
+                    chunkEnd = currentStart + 1;
+                }
+
+                putUniqueSubtitleEntry(result, currentStart, chunkEnd, chunkText);
+                currentStart = chunkEnd;
+            }
+        }
+
+        return result.isEmpty() ? null : result;
+    }
+
+    private static void putUniqueSubtitleEntry(TreeMap<Long, Pair<Long, String>> map, long startMs, long endMs, String text) {
+        long key = startMs;
+        while (map.containsKey(key)) {
+            key++;
+        }
+        map.put(key, new Pair<>(Math.max(key + 1, endMs), text));
+    }
+
+    private static double getSubtitleTextWeight(String str) {
+        if (str == null || str.isEmpty()) return 0.0;
+        double weight = 0;
+        int len = str.length();
+        for (int i = 0; i < len; ) {
+            int cp = str.codePointAt(i);
+            weight += isCjkOrFullWidth(cp) ? 2.0 : 1.0;
+            i += Character.charCount(cp);
+        }
+        return weight;
+    }
+
+    private static boolean isCjkOrFullWidth(int codePoint) {
+        Character.UnicodeBlock block = Character.UnicodeBlock.of(codePoint);
+        return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
+                || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
+                || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B
+                || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS
+                || block == Character.UnicodeBlock.CJK_SYMBOLS_AND_PUNCTUATION
+                || block == Character.UnicodeBlock.HALFWIDTH_AND_FULLWIDTH_FORMS
+                || block == Character.UnicodeBlock.HIRAGANA
+                || block == Character.UnicodeBlock.KATAKANA
+                || block == Character.UnicodeBlock.HANGUL_SYLLABLES
+                || block == Character.UnicodeBlock.HANGUL_JAMO
+                || block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO;
+    }
+
+    private static List<String> chunkSubtitleText(String text) {
+        List<String> chunks = new ArrayList<>();
+        if (TextUtils.isEmpty(text)) return chunks;
+
+        boolean hasSpace = text.contains(" ");
+        List<String> tokens = new ArrayList<>();
+
+        if (hasSpace) {
+            String[] parts = text.split(" ");
+            for (String p : parts) {
+                if (!p.isEmpty()) tokens.add(p);
+            }
+        } else {
+            StringBuilder currentToken = new StringBuilder();
+            int len = text.length();
+            for (int i = 0; i < len; ) {
+                int cp = text.codePointAt(i);
+                int charCount = Character.charCount(cp);
+                currentToken.appendCodePoint(cp);
+
+                if (isPunctuation(cp) || getSubtitleTextWeight(currentToken.toString()) >= 10.0) {
+                    tokens.add(currentToken.toString());
+                    currentToken.setLength(0);
+                }
+                i += charCount;
+            }
+            if (currentToken.length() > 0) {
+                tokens.add(currentToken.toString());
+            }
+        }
+
+        StringBuilder currentChunk = new StringBuilder();
+        double currentWeight = 0;
+
+        for (String token : tokens) {
+            double tokenWeight = getSubtitleTextWeight(token);
+            String separator = (hasSpace && currentChunk.length() > 0) ? " " : "";
+            double additionWeight = tokenWeight + getSubtitleTextWeight(separator);
+
+            if (currentChunk.length() > 0 && (currentWeight + additionWeight > SUBTITLE_TARGET_MAX_WEIGHT)) {
+                chunks.add(currentChunk.toString());
+                currentChunk.setLength(0);
+                currentWeight = 0;
+            }
+
+            if (currentChunk.length() > 0 && hasSpace) {
+                currentChunk.append(" ");
+                currentWeight += getSubtitleTextWeight(" ");
+            }
+
+            if (tokenWeight > SUBTITLE_TARGET_MAX_WEIGHT) {
+                if (currentChunk.length() > 0) {
+                    chunks.add(currentChunk.toString());
+                    currentChunk.setLength(0);
+                    currentWeight = 0;
+                }
+                int tLen = token.length();
+                StringBuilder subToken = new StringBuilder();
+                double subWeight = 0;
+                for (int i = 0; i < tLen; ) {
+                    int cp = token.codePointAt(i);
+                    int charCount = Character.charCount(cp);
+                    double w = isCjkOrFullWidth(cp) ? 2.0 : 1.0;
+                    if (subWeight + w > SUBTITLE_TARGET_MAX_WEIGHT && subToken.length() > 0) {
+                        chunks.add(subToken.toString());
+                        subToken.setLength(0);
+                        subWeight = 0;
+                    }
+                    subToken.appendCodePoint(cp);
+                    subWeight += w;
+                    i += charCount;
+                }
+                if (subToken.length() > 0) {
+                    currentChunk.append(subToken);
+                    currentWeight += subWeight;
+                }
+            } else {
+                currentChunk.append(token);
+                currentWeight += tokenWeight;
+            }
+        }
+
+        if (currentChunk.length() > 0) {
+            chunks.add(currentChunk.toString());
+        }
+
+        return chunks;
+    }
+
+    private static boolean isPunctuation(int codePoint) {
+        int type = Character.getType(codePoint);
+        return type == Character.DASH_PUNCTUATION
+                || type == Character.START_PUNCTUATION
+                || type == Character.END_PUNCTUATION
+                || type == Character.CONNECTOR_PUNCTUATION
+                || type == Character.OTHER_PUNCTUATION
+                || type == Character.INITIAL_QUOTE_PUNCTUATION
+                || type == Character.FINAL_QUOTE_PUNCTUATION;
     }
 
     /**

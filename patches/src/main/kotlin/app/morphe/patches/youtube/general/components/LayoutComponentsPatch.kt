@@ -8,30 +8,28 @@ import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patches.shared.litho.addLithoFilter
 import app.morphe.patches.shared.litho.lithoFilterPatch
-import app.morphe.patches.shared.settingmenu.settingsMenuPatch
 import app.morphe.patches.shared.viewgroup.viewGroupMarginLayoutParamsHookPatch
-import app.morphe.patches.youtube.utils.compatibility.Constants.COMPATIBLE_PACKAGE
+import app.morphe.patches.youtube.utils.compatibility.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.patches.youtube.utils.extension.Constants.COMPONENTS_PATH
 import app.morphe.patches.youtube.utils.extension.Constants.GENERAL_CLASS_DESCRIPTOR
 import app.morphe.patches.youtube.utils.extension.Constants.GENERAL_PATH
 import app.morphe.patches.youtube.utils.fix.litho.lithoLayoutPatch
 import app.morphe.patches.youtube.utils.patch.PatchList.HIDE_LAYOUT_COMPONENTS
-import app.morphe.patches.youtube.utils.playservice.is_19_25_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_20_21_or_greater
 import app.morphe.patches.youtube.utils.playservice.versionCheckPatch
 import app.morphe.patches.youtube.utils.resourceid.accountSwitcherAccessibility
 import app.morphe.patches.youtube.utils.resourceid.fab
-import app.morphe.patches.youtube.utils.resourceid.pairWithTVKey
 import app.morphe.patches.youtube.utils.resourceid.sharedResourceIdPatch
 import app.morphe.patches.youtube.utils.resourceid.ytCallToAction
 import app.morphe.patches.youtube.utils.settings.ResourceUtils.addPreference
 import app.morphe.patches.youtube.utils.settings.settingsPatch
-import app.morphe.util.fingerprint.injectLiteralInstructionBooleanCall
 import app.morphe.util.fingerprint.matchOrThrow
 import app.morphe.util.fingerprint.methodOrThrow
 import app.morphe.util.fingerprint.mutableClassOrThrow
 import app.morphe.util.getReference
 import app.morphe.util.indexOfFirstInstructionOrThrow
 import app.morphe.util.indexOfFirstLiteralInstructionOrThrow
+import app.morphe.util.injectHideViewCall
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
@@ -41,26 +39,25 @@ import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.util.MethodUtil
 
-private const val EXTENSION_SETTINGS_MENU_DESCRIPTOR =
-    "$GENERAL_PATH/SettingsMenuPatch;"
 private const val CUSTOM_FILTER_CLASS_DESCRIPTOR =
     "$COMPONENTS_PATH/CustomFilter;"
 private const val LAYOUT_COMPONENTS_FILTER_CLASS_DESCRIPTOR =
     "$COMPONENTS_PATH/LayoutComponentsFilter;"
+private const val EXPLORE_MENU_FILTER_CLASS_DESCRIPTOR =
+    "$COMPONENTS_PATH/ExploreMenuFilter;"
 
 @Suppress("unused")
 val layoutComponentsPatch = bytecodePatch(
     HIDE_LAYOUT_COMPONENTS.title,
     HIDE_LAYOUT_COMPONENTS.summary,
 ) {
-    compatibleWith(COMPATIBLE_PACKAGE)
+    compatibleWith(COMPATIBILITY_YOUTUBE)
 
     dependsOn(
         settingsPatch,
         lithoFilterPatch,
         lithoLayoutPatch,
         sharedResourceIdPatch,
-        settingsMenuPatch,
         viewGroupMarginLayoutParamsHookPatch,
         versionCheckPatch,
     )
@@ -95,25 +92,6 @@ val layoutComponentsPatch = bytecodePatch(
                     )
                 }
             }
-        }
-
-        // endregion
-
-        // region patch for disable translucent status bar
-
-        if (is_19_25_or_greater) {
-            mapOf(
-                translucentStatusBarPrimaryFeatureFlagFingerprint to TRANSLUCENT_STATUS_BAR_PRIMARY_FEATURE_FLAG,
-                translucentStatusBarSecondaryFeatureFlagFingerprint to TRANSLUCENT_STATUS_BAR_SECONDARY_FEATURE_FLAG,
-            ).forEach { (fingerprint, literal) ->
-                fingerprint.injectLiteralInstructionBooleanCall(
-                    literal,
-                    "$GENERAL_CLASS_DESCRIPTOR->disableTranslucentStatusBar(Z)Z"
-                )
-            }
-
-            settingArray += "PREFERENCE_CATEGORY: GENERAL_EXPERIMENTAL_FLAGS"
-            settingArray += "SETTINGS: DISABLE_TRANSLUCENT_STATUS_BAR"
         }
 
         // endregion
@@ -204,52 +182,6 @@ val layoutComponentsPatch = bytecodePatch(
 
         // endregion
 
-        // region patch for hide setting menus
-
-        preferenceScreenFingerprint.methodOrThrow().apply {
-            val targetIndex = indexOfPreferenceScreenInstruction(this)
-            val targetRegister = getInstruction<FiveRegisterInstruction>(targetIndex).registerC
-            val targetReference = getInstruction<ReferenceInstruction>(targetIndex).reference
-
-            val insertIndex = implementation!!.instructions.lastIndex
-
-            addInstructions(
-                insertIndex + 1, """
-                    invoke-virtual {v$targetRegister}, $targetReference
-                    move-result-object v$targetRegister
-                    invoke-static {v$targetRegister}, $EXTENSION_SETTINGS_MENU_DESCRIPTOR->hideSettingsMenu(Landroidx/preference/PreferenceScreen;)V
-                    return-void
-                    """
-            )
-            removeInstruction(insertIndex)
-        }
-
-        preferencePairWithTVFingerprint.methodOrThrow().apply {
-            val literalIndex = indexOfFirstLiteralInstructionOrThrow(pairWithTVKey)
-            val setPairWithTVPreferenceIndex = indexOfFirstInstructionOrThrow(literalIndex) {
-                opcode == Opcode.IPUT_OBJECT &&
-                        getReference<FieldReference>()?.type == "Landroidx/preference/Preference;"
-            }
-            val pairWithTVField =
-                getInstruction<ReferenceInstruction>(setPairWithTVPreferenceIndex).reference as FieldReference
-            val getPairWithTVPreferenceIndex =
-                indexOfFirstInstructionOrThrow(setPairWithTVPreferenceIndex) {
-                    opcode == Opcode.IGET_OBJECT &&
-                            getReference<FieldReference>() == pairWithTVField
-                }
-            val insertRegister =
-                getInstruction<TwoRegisterInstruction>(getPairWithTVPreferenceIndex).registerA
-
-            addInstructions(
-                getPairWithTVPreferenceIndex + 1, """
-                    invoke-static {v$insertRegister}, $EXTENSION_SETTINGS_MENU_DESCRIPTOR->hideWatchOnTVMenu(Landroidx/preference/Preference;)Landroidx/preference/Preference;
-                    move-result-object v$insertRegister
-                    """
-            )
-        }
-
-        // endregion
-
         // region patch for hide tooltip content
 
         tooltipContentFullscreenFingerprint.methodOrThrow().apply {
@@ -270,8 +202,27 @@ val layoutComponentsPatch = bytecodePatch(
 
         // endregion
 
+        // region hide sync button
+
+        if (is_20_21_or_greater) {
+            SyncButtonFingerprint.let {
+                val syncButtonIndex = it.instructionMatches.last().index
+                val viewRegister = it.method.getInstruction<OneRegisterInstruction>(syncButtonIndex).registerA
+
+                it.method.injectHideViewCall(
+                    syncButtonIndex + 1,
+                    viewRegister,
+                    LAYOUT_COMPONENTS_FILTER_CLASS_DESCRIPTOR,
+                    "hideSyncButton"
+                )
+            }
+        }
+
+        // endregion
+
         addLithoFilter(CUSTOM_FILTER_CLASS_DESCRIPTOR)
         addLithoFilter(LAYOUT_COMPONENTS_FILTER_CLASS_DESCRIPTOR)
+        addLithoFilter(EXPLORE_MENU_FILTER_CLASS_DESCRIPTOR)
 
         // region add settings
 

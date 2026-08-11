@@ -298,7 +298,7 @@ fun ResourcePatchContext.removeStringsElements(
             replacements.forEach replacementsLoop@{ replacement ->
                 targetXml.writeText(
                     targetXml.readText()
-                        .replaceFirst(""" {4}<string name="$replacement".+""".toRegex(), "")
+                        .replaceFirst(""" +<string name="$replacement".+""".toRegex(), "")
                 )
             }
         }
@@ -362,7 +362,7 @@ fun ResourcePatchContext.copyResourcesWithRename(
 
         val resourceFile = "drawable/icon.xml"
         val inputStream = inputStreamFromBundledResource(sourceResourceDirectory, resourceFile)!!
-        val targetFile = targetResourceDirectory.resolve("drawable/$title.xml").toPath()
+        val targetFile = targetResourceDirectory.resolve("drawable/${title}_icon.xml").toPath()
 
         Files.copy(inputStream, targetFile, StandardCopyOption.REPLACE_EXISTING)
 

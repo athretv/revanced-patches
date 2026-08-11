@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import app.morphe.extension.shared.utils.Logger.printDebug
 import app.morphe.extension.shared.utils.Logger.printException
 import app.morphe.extension.youtube.shared.PlayerType
+import app.morphe.extension.youtube.sponsorblock.ui.SponsorBlockViewController
 import app.morphe.extension.youtube.swipecontrols.controller.AudioVolumeController
 import app.morphe.extension.youtube.swipecontrols.controller.ScreenBrightnessController
 import app.morphe.extension.youtube.swipecontrols.controller.SwipeZonesController
@@ -61,6 +62,13 @@ class SwipeControlsHostActivity : Activity() {
     private lateinit var keys: VolumeKeysController
 
     /**
+     * Pass a gesture downstream when it starts on SponsorBlock's draggable new-segment panel.
+     */
+    private var isTouchingNewSegmentLayout = false
+
+    private var playerTypeObserver: ((PlayerType) -> Unit)? = null
+
+    /**
      * current content view with id [android.R.id.content]
      */
     private val contentRoot
@@ -71,6 +79,11 @@ class SwipeControlsHostActivity : Activity() {
         initialize()
     }
 
+    override fun onDestroy() {
+        playerTypeObserver?.let { PlayerType.onChange -= it }
+        super.onDestroy()
+    }
+
     override fun onStart() {
         super.onStart()
         reAttachOverlays()
@@ -78,7 +91,29 @@ class SwipeControlsHostActivity : Activity() {
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
         ensureInitialized()
-        return if ((ev != null) && gesture.submitTouchEvent(ev)) {
+        if (ev == null) {
+            return super.dispatchTouchEvent(ev)
+        }
+
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> isTouchingNewSegmentLayout =
+                SponsorBlockViewController.isNewSegmentLayoutVisibleAndContains(ev.rawX, ev.rawY)
+
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_CANCEL -> {
+                if (isTouchingNewSegmentLayout) {
+                    return super.dispatchTouchEvent(ev).also {
+                        isTouchingNewSegmentLayout = false
+                    }
+                }
+            }
+        }
+
+        if (isTouchingNewSegmentLayout) {
+            return super.dispatchTouchEvent(ev)
+        }
+
+        return if (gesture.submitTouchEvent(ev)) {
             true
         } else {
             super.dispatchTouchEvent(ev)
@@ -149,7 +184,9 @@ class SwipeControlsHostActivity : Activity() {
         gesture = createGestureController()
 
         // listen for changes in the player type
-        PlayerType.onChange += this::onPlayerTypeChanged
+        val observer = { type: PlayerType -> onPlayerTypeChanged(type) }
+        playerTypeObserver = observer
+        PlayerType.onChange += observer
 
         // set current instance reference
         currentHost = WeakReference(this)

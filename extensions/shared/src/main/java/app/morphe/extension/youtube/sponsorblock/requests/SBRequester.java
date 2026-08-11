@@ -31,6 +31,17 @@ import app.morphe.extension.youtube.sponsorblock.objects.SponsorSegment.SegmentV
 import app.morphe.extension.youtube.sponsorblock.objects.UserStats;
 
 public class SBRequester {
+    public enum SegmentSubmitAction {
+        HIGHLIGHT("poi"),
+        SKIP("skip");
+
+        public final String type;
+
+        SegmentSubmitAction(String type) {
+            this.type = type;
+        }
+    }
+
     private static final String TIME_TEMPLATE = "%.3f";
 
     /**
@@ -133,7 +144,6 @@ public class SBRequester {
             // Button should appear only once
             segments.add(new SponsorSegment(SegmentCategory.OUTRO, "debug", 24000, 27000, false));
 
-
             // Test seekbar visibility:
             // All three segments should be viewable on the seekbar
             segments.add(new SponsorSegment(SegmentCategory.MUSIC_OFFTOPIC, "debug", 200000, 300000, false));
@@ -164,7 +174,7 @@ public class SBRequester {
         return segments.toArray(new SponsorSegment[0]);
     }
 
-    public static void submitSegments(String videoId, String category,
+    public static void submitSegments(String videoId, SegmentCategory category, SegmentSubmitAction action,
                                       long startTime, long endTime, long videoLength) {
         Utils.verifyOffMainThread();
 
@@ -175,7 +185,7 @@ public class SBRequester {
             String duration = String.format(Locale.US, TIME_TEMPLATE, videoLength / 1000f);
 
             HttpURLConnection connection = getConnectionFromRoute(SBRoutes.SUBMIT_SEGMENTS,
-                    privateUserId, videoId, category, start, end, duration);
+                    privateUserId, videoId, category.keyValue, start, end, duration, action.type);
             final int responseCode = connection.getResponseCode();
 
             if (responseCode == HTTP_STATUS_CODE_SUCCESS) {
