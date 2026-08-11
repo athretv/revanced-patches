@@ -1,3 +1,18 @@
+# [1.10.0](https://github.com/athretv/revanced-patches/compare/v1.9.0...v1.10.0) (2026-08-11)
+
+
+### Bug Fixes
+
+* fix gradlew permission denied on CI runners ([778b053](https://github.com/athretv/revanced-patches/commit/778b05330688a05fdc1cba2c88d1bfedf434fd8a))
+* idk ([5d882a9](https://github.com/athretv/revanced-patches/commit/5d882a9b1641f00a1fc0fe0d73d98dc8d1412bca))
+* **YouTube Music:** revert old preferences ([21abba5](https://github.com/athretv/revanced-patches/commit/21abba5b4336e9b62a20979f6bd159414e80297b))
+* **YouTube:** revert old preferences ([5fcaee5](https://github.com/athretv/revanced-patches/commit/5fcaee5f71f45b0c022bc352735d950b010501a3))
+
+
+### Features
+
+* update YouTube Music default settings ([49d7677](https://github.com/athretv/revanced-patches/commit/49d7677b8719b486c1d8f5f8baedb0437aee5ad7))
+
 # [1.10.0-dev.1](https://github.com/athretv/revanced-patches/compare/v1.9.1-dev.2...v1.10.0-dev.1) (2026-08-11)
 
 
