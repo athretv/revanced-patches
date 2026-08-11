@@ -1,3 +1,5 @@
+# Copyright (C) 2026 anddea
+
 """XML Processor."""
 
 from __future__ import annotations
@@ -60,15 +62,59 @@ class XMLProcessor:
         return ET.tostring(element, encoding="unicode", method="xml")
 
     @staticmethod
+    def _indent_root_only(root: ET.Element, space: str = "    ") -> None:
+        """Indent only the immediate children of the root element.
+
+        This prevents recursive indentation from adding newlines and spaces
+        inside individual string resources containing child elements (e.g., <small>).
+        """
+        children = list(root)
+        if not children:
+            return
+
+        root.text = f"\n{space}"
+        for i, child in enumerate(children):
+            if i < len(children) - 1:
+                child.tail = f"\n{space}"
+            else:
+                child.tail = "\n"
+
+    @staticmethod
     def write_file(path: Path, root: ET.Element) -> None:
         """Write an XML element tree to a file."""
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             tree = ET.ElementTree(root)
-            ET.indent(tree, space="    ")
+            XMLProcessor._indent_root_only(root, space="    ")
             with path.open("wb") as f:
                 f.write(b'<?xml version="1.0" encoding="utf-8"?>\n')
                 tree.write(f, encoding="utf-8", xml_declaration=False)
                 f.write(b"\n")
         except OSError:
             logger.exception("Failed to write file: %s", path)
+
+    @staticmethod
+    def cleanup_if_empty(path: Path) -> bool:
+        """Remove the XML file if it exists and contains no string/resource elements or is invalid.
+
+        Args:
+            path: Path to the XML file.
+
+        Returns:
+            True if the file was deleted, False otherwise.
+
+        """
+        if not path.exists():
+            return False
+
+        _tree, root, strings = XMLProcessor.parse_file(path)
+        if root is None or len(root) == 0 or not strings:
+            try:
+                path.unlink()
+            except OSError:
+                logger.exception("Failed to remove empty XML file: %s", path)
+            else:
+                logger.info("Removed empty or invalid XML file: %s", path)
+                return True
+
+        return False

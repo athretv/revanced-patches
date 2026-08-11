@@ -1,3 +1,5 @@
+# Copyright (C) 2026 anddea
+
 """Handler to check icons in prefs."""
 
 from __future__ import annotations
@@ -86,7 +88,7 @@ def process(app: str) -> None:
 
     kotlin_file_path = (
         settings.BASE_DIR
-        / "patches/src/main/kotlin/app/revanced/patches"
+        / "patches/src/main/kotlin/app/morphe/patches"
         / app
         / "layout/visual/VisualPreferencesIconsPatch.kt"
     )

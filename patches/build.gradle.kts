@@ -1,13 +1,13 @@
-group = "app.revanced"
+group = "app.morphe"
 
 patches {
     about {
-        name = "ReVanced Patches"
-        description = "Patches for ReVanced"
-        source = "git@github.com:revanced/revanced-patches.git"
-        author = "ReVanced"
-        contact = "contact@revanced.app"
-        website = "https://revanced.app"
+        name = "RVX Patches"
+        description = "Patches for RVX"
+        source = "git@github.com:anddea/revanced-patches.git"
+        author = "Aaron Veil (anddea)"
+        contact = "https://github.com/anddea/revanced-patches/issues"
+        website = "https://rvxtranslate.vercel.app/"
         license = "GNU General Public License v3.0"
     }
 }
@@ -19,25 +19,25 @@ dependencies {
 
 tasks {
     jar {
-        exclude("app/revanced/generator")
+        exclude("app/morphe/generator")
     }
-    register<JavaExec>("generatePatchesFiles") {
-        description = "Generate patches files"
+    register<JavaExec>("generatePatchesList") {
+        description = "Build patch with patch list"
 
         dependsOn(build)
 
         classpath = sourceSets["main"].runtimeClasspath
-        mainClass.set("app.revanced.generator.MainKt")
+        mainClass.set("app.morphe.generator.MainKt")
     }
     // Used by gradle-semantic-release-plugin.
     publish {
-        dependsOn("generatePatchesFiles")
+        dependsOn("generatePatchesList")
     }
 }
 
 kotlin {
     compilerOptions {
-        freeCompilerArgs = listOf("-Xcontext-receivers")
+        freeCompilerArgs = listOf("-Xcontext-parameters")
     }
 }
 
@@ -45,7 +45,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/AykhanUV/revanced-patches")
+            url = uri("https://maven.pkg.github.com/anddea/revanced-patches")
             credentials {
                 username = System.getenv("GITHUB_ACTOR")
                 password = System.getenv("GITHUB_TOKEN")
