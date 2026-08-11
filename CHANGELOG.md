@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/athretv/revanced-patches/compare/v1.10.0...v1.11.0) (2026-08-11)
+
+
+### Features
+
+* update default settings and branding ([9791a92](https://github.com/athretv/revanced-patches/commit/9791a92fe21c4e03ba016c22f3370391e3e0cc5e))
+
 # [1.10.0](https://github.com/athretv/revanced-patches/compare/v1.9.0...v1.10.0) (2026-08-11)
 
 
