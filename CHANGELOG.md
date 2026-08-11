@@ -1,3 +1,10 @@
+# [1.10.0-dev.1](https://github.com/athretv/revanced-patches/compare/v1.9.1-dev.2...v1.10.0-dev.1) (2026-08-11)
+
+
+### Features
+
+* update YouTube Music default settings ([49d7677](https://github.com/athretv/revanced-patches/commit/49d7677b8719b486c1d8f5f8baedb0437aee5ad7))
+
 ## [1.9.1-dev.2](https://github.com/AykhanUV/revanced-patches/compare/v1.9.1-dev.1...v1.9.1-dev.2) (2026-03-18)
 
 
