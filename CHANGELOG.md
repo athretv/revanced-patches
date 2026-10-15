@@ -1,3 +1,15 @@
+# [1.12.0](https://github.com/athretv/revanced-patches/compare/v1.11.0...v1.12.0) (2026-10-15)
+
+
+### Bug Fixes
+
+* **ci:** fetch full git history and notes for release ([4bd5466](https://github.com/athretv/revanced-patches/commit/4bd546654971940b338d2c4158775d9f6b94fc09))
+
+
+### Features
+
+* merge with the upstream ([f9eb368](https://github.com/athretv/revanced-patches/commit/f9eb3687abdc9d0633911f5589add0dab1c6a4c1))
+
 # [1.11.0](https://github.com/athretv/revanced-patches/compare/v1.10.0...v1.11.0) (2026-08-11)
 
 

@@ -1,5 +1,5 @@
 {
-  "version": "4.4.0-dev.1",
+  "version": "1.12.0",
   "patches": [
     {
       "name": "Ambient mode control",
@@ -2882,7 +2882,6 @@
       "description": "Add translations or remove string resources.",
       "use": true,
       "dependencies": [
-        "BytecodePatch",
         "ResourcePatch"
       ],
       "compatiblePackages": {
@@ -2926,7 +2925,6 @@
       "description": "Add translations or remove string resources.",
       "use": true,
       "dependencies": [
-        "BytecodePatch",
         "ResourcePatch"
       ],
       "compatiblePackages": {
@@ -3111,7 +3109,7 @@
     {
       "name": "Voice Over Translation",
       "description": "Adds an option to enable Yandex voice-over translation of video audio tracks.",
-      "use": true,
+      "use": false,
       "dependencies": [
         "ResourcePatch",
         "BytecodePatch",
