@@ -1,3 +1,13 @@
+/*
+ * Copyright 2026 Morphe.
+ * https://github.com/MorpheApp/morphe-patches
+ *
+ * Original hard forked code:
+ * https://github.com/ReVanced/revanced-patches/commit/724e6d61b2ecd868c1a9a37d465a688e83a74799
+ *
+ * See the included NOTICE file for GPLv3 Section 7 terms that apply to Morphe contributions.
+ */
+
 package app.morphe.extension.youtube.patches.components;
 
 import static app.morphe.extension.youtube.utils.ExtendedUtils.IS_20_31_OR_GREATER;
@@ -9,11 +19,28 @@ import app.morphe.extension.shared.patches.components.StringFilterGroup;
 import app.morphe.extension.shared.utils.StringTrieSearch;
 import app.morphe.extension.youtube.settings.Settings;
 import app.morphe.extension.youtube.shared.PlayerType;
+import app.morphe.extension.youtube.shared.ShortsPlayerState;
 
 @SuppressWarnings("unused")
 public final class PlayerFlyoutMenuFilter extends Filter {
+    private static boolean topFlyoutMenuVisible;
+    public static boolean getTopFlyoutMenuVisible() {
+        return topFlyoutMenuVisible;
+    }
+    public static void resetTopFlyoutMenuVisible() {
+        topFlyoutMenuVisible = false;
+    }
+
     private final ByteArrayFilterGroupList flyoutFilterGroupList = new ByteArrayFilterGroupList();
 
+    private final ByteArrayFilterGroup videoPlayerSettingsQualityButton = new ByteArrayFilterGroup(
+            null,
+            "quality_sheet_header.e"
+    );
+    private final ByteArrayFilterGroup shortsPlayerSettingsCaptionsButton = new ByteArrayFilterGroup(
+            null,
+            "closed_captions"
+    );
     private final ByteArrayFilterGroup flyoutLoopVideoButton;
     private final ByteArrayFilterGroup qualityMenuButton;
     private final ByteArrayFilterGroup byteArrayException;
@@ -93,6 +120,11 @@ public final class PlayerFlyoutMenuFilter extends Filter {
                         "yt_outline_lock_"
                 ),
                 new ByteArrayFilterGroup(
+                        Settings.HIDE_PLAYER_FLYOUT_ON_THE_GO,
+                        "yt_outline_headset_",
+                        "yt_outline_experimental_headset_"
+                ),
+                new ByteArrayFilterGroup(
                         Settings.HIDE_PLAYER_FLYOUT_MENU_MORE,
                         "yt_outline_info_circle_"
                 ),
@@ -153,9 +185,22 @@ public final class PlayerFlyoutMenuFilter extends Filter {
                 return false;
             }
 
+            // Verify that the open flyout menu is the first one and not the 'others'
+            // one, by checking the filtering of its first button (quality menu).
+            // The path already starts with the overflow menu item, while the buffer
+            // does not always contain it (20.21 keeps it in a separate buffer).
+            boolean videoPlayerFlyout = PlayerType.getCurrent().isMaximizedOrFullscreen()
+                    && videoPlayerSettingsQualityButton.check(buffer).isFiltered();
+            boolean shortsPlayerFlyout = ShortsPlayerState.getCurrent().isOpen()
+                    && shortsPlayerSettingsCaptionsButton.check(buffer).isFiltered();
+            if (videoPlayerFlyout || shortsPlayerFlyout) {
+                topFlyoutMenuVisible = true;
+            }
+
             // Shorts also use this player flyout panel
-            if (PlayerType.getCurrent().isNoneOrHidden()) {
-                return false;
+            if (PlayerType.getCurrent().isNoneOrHidden() || ShortsPlayerState.getCurrent().isOpen()) {
+                return Settings.HIDE_PLAYER_FLYOUT_MENU_CAPTIONS.get()
+                        && shortsPlayerSettingsCaptionsButton.check(buffer).isFiltered();
             }
 
             if (IS_20_31_OR_GREATER && pathBuilderException.matches(path)) {

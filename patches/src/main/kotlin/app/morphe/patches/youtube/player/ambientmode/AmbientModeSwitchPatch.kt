@@ -1,3 +1,13 @@
+/*
+ * Copyright 2026 Morphe.
+ * https://github.com/MorpheApp/morphe-patches
+ *
+ * Original hard forked code:
+ * https://github.com/ReVanced/revanced-patches/commit/724e6d61b2ecd868c1a9a37d465a688e83a74799
+ *
+ * See the included NOTICE file for GPLv3 Section 7 terms that apply to Morphe contributions.
+ */
+
 package app.morphe.patches.youtube.player.ambientmode
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
@@ -6,14 +16,15 @@ import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patches.youtube.utils.compatibility.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.patches.youtube.utils.extension.Constants.PLAYER_CLASS_DESCRIPTOR
 import app.morphe.patches.youtube.utils.patch.PatchList.AMBIENT_MODE_CONTROL
+import app.morphe.util.findMethodsOrThrow
 import app.morphe.patches.youtube.utils.playservice.is_19_34_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_19_41_or_greater
 import app.morphe.patches.youtube.utils.playservice.versionCheckPatch
 import app.morphe.patches.youtube.utils.settings.ResourceUtils.addPreference
 import app.morphe.patches.youtube.utils.settings.settingsPatch
 import app.morphe.util.findMethodOrThrow
-import app.morphe.util.fingerprint.injectLiteralInstructionBooleanCall
-import app.morphe.util.fingerprint.methodOrThrow
+import app.morphe.util.insertLiteralOverride
+import app.morphe.util.insertLiteralOverrideAtInlinedSites
 import app.morphe.util.getReference
 import app.morphe.util.indexOfFirstInstructionOrThrow
 import app.morphe.util.indexOfFirstInstructionReversedOrThrow
@@ -39,31 +50,39 @@ val ambientModeSwitchPatch = bytecodePatch(
     execute {
         // region patch for bypass ambient mode restrictions
 
-        var syntheticClassList = emptyArray<String>()
+        // modified by lavinhoque33, 2026-10-04
+        // 21.39: there are two matching BroadcastReceivers (each with its own synthetic Consumer),
+        // and the "(Object)V" fingerprint now matches an unrelated method whose nearest invoke-direct
+        // class has no `accept`. Patch every receiver match and skip classes without `accept`.
+        val syntheticClassList = mutableListOf<String>()
 
-        mapOf(
-            powerSaveModeBroadcastReceiverFingerprint to false,
-            powerSaveModeSyntheticFingerprint to true
-        ).forEach { (fingerprint, reversed) ->
-            fingerprint.methodOrThrow().apply {
-                val stringIndex =
-                    indexOfFirstStringInstructionOrThrow("android.os.action.POWER_SAVE_MODE_CHANGED")
-                val targetIndex =
-                    if (reversed)
-                        indexOfFirstInstructionReversedOrThrow(stringIndex, Opcode.INVOKE_DIRECT)
-                    else
-                        indexOfFirstInstructionOrThrow(stringIndex, Opcode.INVOKE_DIRECT)
-                val targetClass =
-                    (getInstruction<ReferenceInstruction>(targetIndex).reference as MethodReference).definingClass
+        val fingerprintMatches = buildList {
+            runCatching { powerSaveModeBroadcastReceiverFingerprint.matchAll() }.getOrNull()
+                ?.forEach { add(it.method to false) }
+            runCatching { powerSaveModeSyntheticFingerprint.match() }.getOrNull()
+                ?.let { add(it.method to true) }
+        }
 
-                syntheticClassList += targetClass
+        fingerprintMatches.forEach { (method, reversed) ->
+            runCatching {
+                method.apply {
+                    val stringIndex =
+                        indexOfFirstStringInstructionOrThrow("android.os.action.POWER_SAVE_MODE_CHANGED")
+                    val targetIndex =
+                        if (reversed)
+                            indexOfFirstInstructionReversedOrThrow(stringIndex, Opcode.INVOKE_DIRECT)
+                        else
+                            indexOfFirstInstructionOrThrow(stringIndex, Opcode.INVOKE_DIRECT)
+                    val targetClass =
+                        (getInstruction<ReferenceInstruction>(targetIndex).reference as MethodReference).definingClass
+
+                    syntheticClassList += targetClass
+                }
             }
         }
 
         syntheticClassList.distinct().forEach { className ->
-            findMethodOrThrow(className) {
-                name == "accept"
-            }.apply {
+            (findMethodsOrThrow(className).firstOrNull { it.name == "accept" } ?: return@forEach).apply {
                 implementation!!.instructions
                     .withIndex()
                     .filter { (_, instruction) ->
@@ -89,17 +108,43 @@ val ambientModeSwitchPatch = bytecodePatch(
 
         // endregion
 
-        // region patch for disable ambient mode in fullscreen
-
-        if (!is_19_41_or_greater) {
-            ambientModeInFullscreenFingerprint.injectLiteralInstructionBooleanCall(
-                AMBIENT_MODE_IN_FULLSCREEN_FEATURE_FLAG,
-                "$PLAYER_CLASS_DESCRIPTOR->disableAmbientModeInFullscreen()Z"
+        //
+        // Disable ambient mode.
+        //
+        AmbientModeFeatureFlagFingerprint.matchAll().forEach {
+            // 21.30+ inlines the flag lookup and must patch ~5 places.
+            it.method.insertLiteralOverride(
+                it.instructionMatches.first().index,
+                "$PLAYER_CLASS_DESCRIPTOR->disableAmbientMode(Z)Z"
             )
         }
 
+        // YouTube 21.39 also reads the flag a second time in one of the matched methods.
+        insertLiteralOverrideAtInlinedSites(
+            45376186L,
+            "$PLAYER_CLASS_DESCRIPTOR->disableAmbientMode(Z)Z"
+        )
+
+        // region patch for disable ambient mode in fullscreen
+
+        if (!is_19_41_or_greater) {
+            ambientModeInFullscreenFingerprint.method.apply {
+                val literalIndex = ambientModeInFullscreenFingerprint.instructionMatches.first().index
+                val index = indexOfFirstInstructionOrThrow(literalIndex, Opcode.MOVE_RESULT)
+                val register = getInstruction<OneRegisterInstruction>(index).registerA
+
+                addInstructions(
+                    index + 1,
+                    """
+                        invoke-static {}, $PLAYER_CLASS_DESCRIPTOR->disableAmbientModeInFullscreen()Z
+                        move-result v$register
+                    """
+                )
+            }
+        }
+
         if (is_19_34_or_greater) {
-            setFullScreenBackgroundColorFingerprint.methodOrThrow().apply {
+            setFullScreenBackgroundColorFingerprint.method.apply {
                 val insertIndex = indexOfFirstInstructionReversedOrThrow {
                     getReference<MethodReference>()?.name == "setBackgroundColor"
                 }

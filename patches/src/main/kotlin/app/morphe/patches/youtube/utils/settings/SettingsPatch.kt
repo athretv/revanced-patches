@@ -9,6 +9,9 @@
  * - inotia00 (https://github.com/inotia00)
  * - KobeW50 (https://github.com/KobeW50)
  *
+ * Modified by lavinhoque33 (2026-10-04): experimental YouTube 21.39 support
+ * (inlined Cairo fragment flag).
+ *
  * Licensed under the GNU General Public License v3.0.
  *
  * ------------------------------------------------------------------------
@@ -56,7 +59,10 @@ import app.morphe.patches.shared.boldIconsFeatureFlagMethodFingerprint
 import app.morphe.patches.shared.extension.Constants.EXTENSION_THEME_UTILS_CLASS_DESCRIPTOR
 import app.morphe.patches.shared.extension.Constants.EXTENSION_UTILS_CLASS_DESCRIPTOR
 import app.morphe.patches.shared.mainactivity.injectConstructorMethodCall
+import app.morphe.patches.shared.misc.settings.YOUTUBE_SETTINGS_ENTRY_KEY
+import app.morphe.patches.shared.misc.settings.customSettingsNameInstructions
 import app.morphe.patches.shared.settings.baseSettingsPatch
+import app.morphe.patches.youtube.layout.hide.settingsmenu.PreferenceScreenSyntheticFingerprint
 import app.morphe.patches.youtube.utils.CAIRO_FRAGMENT_FEATURE_FLAG
 import app.morphe.patches.youtube.utils.cairoFragmentConfigFingerprint
 import app.morphe.patches.youtube.utils.compatibility.Constants.COMPATIBILITY_YOUTUBE
@@ -72,6 +78,7 @@ import app.morphe.patches.youtube.utils.mainactivity.mainActivityResolvePatch
 import app.morphe.patches.youtube.utils.patch.PatchList.SETTINGS_FOR_YOUTUBE
 import app.morphe.patches.youtube.utils.playservice.is_19_28_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_20_31_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_21_12_or_greater
 import app.morphe.patches.youtube.utils.playservice.versionCheckPatch
 import app.morphe.patches.youtube.utils.resourceid.settingsFragment
 import app.morphe.patches.youtube.utils.resourceid.sharedResourceIdPatch
@@ -86,6 +93,7 @@ import app.morphe.util.findElementByAttributeValueOrThrow
 import app.morphe.util.findInstructionIndicesReversedOrThrow
 import app.morphe.util.fingerprint.methodCall
 import app.morphe.util.fingerprint.methodOrThrow
+import app.morphe.util.getFreeRegisterProvider
 import app.morphe.util.getReference
 import app.morphe.util.indexOfFirstInstructionOrThrow
 import app.morphe.util.indexOfFirstLiteralInstructionOrThrow
@@ -96,7 +104,10 @@ import app.morphe.util.valueOrThrow
 import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
@@ -115,8 +126,7 @@ private const val EXTENSION_CLASS_DESCRIPTOR =
 
 private lateinit var bytecodeContext: BytecodePatchContext
 
-internal fun getBytecodeContext() = bytecodeContext
-
+@Suppress("DEPRECATION")
 private val settingsBytecodePatch = bytecodePatch(
     description = "settingsBytecodePatch"
 ) {
@@ -134,7 +144,27 @@ private val settingsBytecodePatch = bytecodePatch(
         // region fix cairo fragment
 
         if (is_19_28_or_greater) {
+            // YouTube 21.x+ inlines the Cairo flag check (const-wide + flag getter call)
+            // into its callers instead of calling a dedicated boolean getter.
+            fun MutableMethod.overrideInlinedCairoFragmentConfig(): Boolean {
+                val literalIndices = implementation!!.instructions.withIndex()
+                    .filter { (_, instruction) ->
+                        (instruction as? WideLiteralInstruction)?.wideLiteral == CAIRO_FRAGMENT_FEATURE_FLAG
+                    }
+                    .map { it.index }
+                // Insert from the bottom up so earlier indices stay valid.
+                literalIndices.asReversed().forEach { index ->
+                    insertLiteralOverride(
+                        index,
+                        "$EXTENSION_CLASS_DESCRIPTOR->disableCairoSettingsFragment(Z)Z"
+                    )
+                }
+                return literalIndices.isNotEmpty()
+            }
+
             fun MutableMethod.disableCairoFragmentConfig() {
+                if (overrideInlinedCairoFragmentConfig()) return
+
                 val cairoFragmentConfigMethodCall = cairoFragmentConfigFingerprint
                     .methodCall()
                 val insertIndex = indexOfFirstInstructionOrThrow {
@@ -196,7 +226,7 @@ private val settingsBytecodePatch = bytecodePatch(
             }
         }
 
-        if (is_20_31_or_greater) {
+        if (is_20_31_or_greater && !is_21_12_or_greater) {
             boldIconsFeatureFlagMethodFingerprint.method.insertLiteralOverride(
                 BOLD_ICONS_FEATURE_FLAG,
                 "$EXTENSION_CLASS_DESCRIPTOR->useBoldIcons(Z)Z"
@@ -296,6 +326,39 @@ private val settingsBytecodePatch = bytecodePatch(
                 )
             }.let(methods::add)
         }
+
+        PreferenceScreenSyntheticFingerprint.let {
+            it.method.apply {
+                // Reuse the method's own getPreferenceScreen call.
+                val getPreferenceScreenIndex = it.instructionMatches[1].index
+                val fragmentRegister =
+                    getInstruction<FiveRegisterInstruction>(getPreferenceScreenIndex).registerC
+                val getPreferenceScreenReference =
+                    getInstruction<ReferenceInstruction>(getPreferenceScreenIndex).reference
+
+                // fragmentRegister must survive, because the settings menu filter patch
+                // adds its own call on it after these instructions.
+                val insertIndex = it.instructionMatches.last().index
+                val registerProvider = getFreeRegisterProvider(insertIndex, 3, fragmentRegister)
+                val screenRegister = registerProvider.getFreeRegister()
+                val preferenceRegister = registerProvider.getFreeRegister()
+                val nameRegister = registerProvider.getFreeRegister()
+
+                addInstructionsAtControlFlowLabel(
+                    insertIndex,
+                    customSettingsNameInstructions(
+                        preferenceKey = YOUTUBE_SETTINGS_ENTRY_KEY,
+                        getPreferenceScreen = """
+                            invoke-virtual { v$fragmentRegister }, $getPreferenceScreenReference
+                            move-result-object v$screenRegister
+                        """,
+                        screenRegister = screenRegister,
+                        preferenceRegister = preferenceRegister,
+                        nameRegister = nameRegister
+                    )
+                )
+            }
+        }
     }
 }
 
@@ -347,6 +410,30 @@ val settingsPatch = resourcePatch(
         ResourceUtils.setContext(this)
 
         /**
+         * YouTube 21.39 no longer ships the flat (non-Cairo) res/xml/settings_fragment.xml.
+         * Rebuild it from settings_fragment_cairo.xml by hoisting every preference out of
+         * its category, which is the layout the old settings menu used.
+         *
+         * Added by lavinhoque33 (2026-10-04) for experimental YouTube 21.39 support.
+         */
+        if (!get(ResourceUtils.YOUTUBE_SETTINGS_PATH).exists()) {
+            FilesCompat.copy(
+                get(ResourceUtils.YOUTUBE_CAIRO_SETTINGS_PATH),
+                get(ResourceUtils.YOUTUBE_SETTINGS_PATH)
+            )
+            document(ResourceUtils.YOUTUBE_SETTINGS_PATH).use { document ->
+                val root = document.documentElement
+                val categories = document.getElementsByTagName("PreferenceCategory")
+                List(categories.length) { categories.item(it) as Element }.forEach { category ->
+                    while (category.firstChild != null) {
+                        root.insertBefore(category.firstChild, category)
+                    }
+                    root.removeChild(category)
+                }
+            }
+        }
+
+        /**
          * remove strings duplicated with RVX resources
          *
          * YouTube does not provide translations for these strings.
@@ -388,6 +475,8 @@ val settingsPatch = resourcePatch(
         arrayOf(
             ResourceGroup(
                 "drawable",
+                "morphe_settings_screen_02_dearrow.xml",
+                "morphe_settings_screen_02_dearrow_bold.xml",
                 "revanced_settings_arrow_time.xml",
                 "revanced_settings_cursor.xml",
                 "revanced_settings_custom_checkmark.xml",
@@ -409,6 +498,8 @@ val settingsPatch = resourcePatch(
                 "revanced_preference_search_result_group_header.xml",
                 "revanced_preference_search_result_list.xml",
                 "revanced_preference_search_result_regular.xml",
+                "revanced_preference_search_result_range_slider.xml",
+                "revanced_preference_search_result_slider.xml",
                 "revanced_preference_search_result_switch.xml",
                 "revanced_settings_preferences_category.xml",
                 "revanced_settings_with_toolbar.xml",
@@ -435,10 +526,11 @@ val settingsPatch = resourcePatch(
 
         val generalExperimentalSettings = mutableListOf(
             "PREFERENCE_SCREEN: GENERAL",
+            "SETTINGS: THEME_SETTINGS",
             "PREFERENCE_CATEGORY: GENERAL_EXPERIMENTAL_FLAGS",
             "SETTINGS: RESTORE_OLD_SETTINGS_MENUS",
         )
-        if (is_20_31_or_greater) {
+        if (is_20_31_or_greater && !is_21_12_or_greater) {
             generalExperimentalSettings += "SETTINGS: DISABLE_BOLD_ICONS"
         }
         ResourceUtils.addPreference(

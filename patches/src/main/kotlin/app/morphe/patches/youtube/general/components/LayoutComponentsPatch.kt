@@ -1,9 +1,19 @@
+/*
+ * Portions of this file are ported from Morphe:
+ * Copyright 2026 Morphe.
+ * https://github.com/MorpheApp/morphe-patches
+ *
+ * Original hard forked code:
+ * https://github.com/ReVanced/revanced-patches/commit/724e6d61b2ecd868c1a9a37d465a688e83a74799
+ *
+ * See the included NOTICE file for GPLv3 Section 7 terms that apply to Morphe contributions.
+ */
+
 package app.morphe.patches.youtube.general.components
 
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
-import app.morphe.patcher.extensions.InstructionExtensions.removeInstruction
 import app.morphe.patcher.patch.PatchException
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patches.shared.litho.addLithoFilter
@@ -12,17 +22,21 @@ import app.morphe.patches.shared.viewgroup.viewGroupMarginLayoutParamsHookPatch
 import app.morphe.patches.youtube.utils.compatibility.Constants.COMPATIBILITY_YOUTUBE
 import app.morphe.patches.youtube.utils.extension.Constants.COMPONENTS_PATH
 import app.morphe.patches.youtube.utils.extension.Constants.GENERAL_CLASS_DESCRIPTOR
-import app.morphe.patches.youtube.utils.extension.Constants.GENERAL_PATH
 import app.morphe.patches.youtube.utils.fix.litho.lithoLayoutPatch
 import app.morphe.patches.youtube.utils.patch.PatchList.HIDE_LAYOUT_COMPONENTS
 import app.morphe.patches.youtube.utils.playservice.is_20_21_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_21_04_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_21_07_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_21_11_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_21_25_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_21_26_or_greater
 import app.morphe.patches.youtube.utils.playservice.versionCheckPatch
 import app.morphe.patches.youtube.utils.resourceid.accountSwitcherAccessibility
-import app.morphe.patches.youtube.utils.resourceid.fab
 import app.morphe.patches.youtube.utils.resourceid.sharedResourceIdPatch
 import app.morphe.patches.youtube.utils.resourceid.ytCallToAction
 import app.morphe.patches.youtube.utils.settings.ResourceUtils.addPreference
 import app.morphe.patches.youtube.utils.settings.settingsPatch
+import app.morphe.util.Utils.printWarn
 import app.morphe.util.fingerprint.matchOrThrow
 import app.morphe.util.fingerprint.methodOrThrow
 import app.morphe.util.fingerprint.mutableClassOrThrow
@@ -30,12 +44,12 @@ import app.morphe.util.getReference
 import app.morphe.util.indexOfFirstInstructionOrThrow
 import app.morphe.util.indexOfFirstLiteralInstructionOrThrow
 import app.morphe.util.injectHideViewCall
+import app.morphe.util.insertLiteralOverride
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
-import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.util.MethodUtil
 
@@ -71,27 +85,31 @@ val layoutComponentsPatch = bytecodePatch(
 
         // region patch for disable pip notification
 
-        pipNotificationFingerprint.matchOrThrow().let {
-            it.method.apply {
-                val checkCastCalls = implementation!!.instructions.withIndex()
-                    .filter { instruction ->
-                        (instruction.value as? ReferenceInstruction)?.reference.toString() == "Lcom/google/apps/tiktok/account/AccountId;"
+        if (!is_21_04_or_greater) {
+            pipNotificationFingerprint.matchOrThrow().let {
+                it.method.apply {
+                    val checkCastCalls = implementation!!.instructions.withIndex()
+                        .filter { instruction ->
+                            (instruction.value as? ReferenceInstruction)?.reference.toString() == "Lcom/google/apps/tiktok/account/AccountId;"
+                        }
+
+                    val checkCastCallSize = checkCastCalls.size
+                    if (checkCastCallSize != 3)
+                        throw PatchException("Couldn't find target index, size: $checkCastCallSize")
+
+                    arrayOf(
+                        checkCastCalls.elementAt(1).index,
+                        checkCastCalls.elementAt(0).index
+                    ).forEach { index ->
+                        addInstruction(
+                            index + 1,
+                            "return-void"
+                        )
                     }
-
-                val checkCastCallSize = checkCastCalls.size
-                if (checkCastCallSize != 3)
-                    throw PatchException("Couldn't find target index, size: $checkCastCallSize")
-
-                arrayOf(
-                    checkCastCalls.elementAt(1).index,
-                    checkCastCalls.elementAt(0).index
-                ).forEach { index ->
-                    addInstruction(
-                        index + 1,
-                        "return-void"
-                    )
                 }
             }
+        } else {
+            printWarn("\"Disable PiP notification\" is not supported in this version. Use YouTube versions up to 20.51.")
         }
 
         // endregion
@@ -144,17 +162,27 @@ val layoutComponentsPatch = bytecodePatch(
 
         // region patch for hide floating microphone
 
-        floatingMicrophoneFingerprint.methodOrThrow().apply {
-            val literalIndex = indexOfFirstLiteralInstructionOrThrow(fab)
-            val booleanIndex = indexOfFirstInstructionOrThrow(literalIndex, Opcode.IGET_BOOLEAN)
-            val insertRegister = getInstruction<TwoRegisterInstruction>(booleanIndex).registerA
+        val showFloatingMicrophoneButtonFingerprints = mutableListOf(
+            if (is_21_11_or_greater) ShowFloatingMicrophoneButtonFingerprint
+            else ShowFloatingMicrophoneButtonLegacyFingerprint
+        )
+        if (is_21_25_or_greater) {
+            showFloatingMicrophoneButtonFingerprints += ShowFloatingMicrophoneButtonStubFingerprint
+        }
 
-            addInstructions(
-                booleanIndex + 1, """
-                    invoke-static {v$insertRegister}, $GENERAL_CLASS_DESCRIPTOR->hideFloatingMicrophone(Z)Z
-                    move-result v$insertRegister
+        showFloatingMicrophoneButtonFingerprints.forEach {
+            it.method.apply {
+                val index = it.instructionMatches.last().index
+                val register = getInstruction<TwoRegisterInstruction>(index).registerA
+
+                addInstructions(
+                    index + 1,
                     """
-            )
+                        invoke-static { v$register }, $GENERAL_CLASS_DESCRIPTOR->hideFloatingMicrophone(Z)Z
+                        move-result v$register
+                    """
+                )
+            }
         }
 
         // endregion
@@ -184,7 +212,10 @@ val layoutComponentsPatch = bytecodePatch(
 
         // region patch for hide tooltip content
 
-        tooltipContentFullscreenFingerprint.methodOrThrow().apply {
+        // modified by lavinhoque33, 2026-10-04
+        // YouTube 21.39 removed feature flag 45384061 (fullscreen tooltip) entirely; skip this hook if the method is gone.
+        // The fullscreen tooltip code path is gone in 21.39, and the remaining tooltips are still hidden below.
+        runCatching { tooltipContentFullscreenFingerprint.methodOrThrow() }.getOrNull()?.apply {
             val literalIndex = indexOfFirstLiteralInstructionOrThrow(45384061L)
             val targetIndex = indexOfFirstInstructionOrThrow(literalIndex, Opcode.MOVE_RESULT)
             val targetRegister = getInstruction<OneRegisterInstruction>(targetIndex).registerA
@@ -214,6 +245,41 @@ val layoutComponentsPatch = bytecodePatch(
                     viewRegister,
                     LAYOUT_COMPONENTS_FILTER_CLASS_DESCRIPTOR,
                     "hideSyncButton"
+                )
+            }
+        }
+
+        // endregion
+
+        // region disable UI padding feature flags
+
+        if (is_21_07_or_greater) {
+            listOf(
+                CommentReplyPaddingFeatureFlagFingerprint,
+                IncognitoSearchPaddingFeatureFlagFingerprint
+            ).forEach { fingerprint ->
+                fingerprint.matchAll().forEach {
+                    it.method.insertLiteralOverride(
+                        it.instructionMatches.first().index,
+                        "$LAYOUT_COMPONENTS_FILTER_CLASS_DESCRIPTOR->disableUIPaddingFeatureFlags(Z)Z"
+                    )
+                }
+            }
+        }
+
+        // endregion
+
+        // region fix live chat text field behind the navigation bar
+
+        // https://github.com/MorpheApp/morphe-patches/issues/3453
+        // The flag is read by different layouts, and each must use the same value,
+        // otherwise other panels such as the comments show the bottom padding twice.
+        // Flag was removed in 21.26+.
+        if (is_21_11_or_greater && !is_21_26_or_greater) {
+            EngagementPanelEdgeToEdgeFeatureFlagFingerprint.matchAll().forEach {
+                it.method.insertLiteralOverride(
+                    it.instructionMatches.first().index,
+                    false
                 )
             }
         }

@@ -58,6 +58,7 @@ private val reloadVideoResourcePatch = resourcePatch {
                 ResourceGroup(
                     resourceDirectoryName = "drawable",
                     "morphe_reload_video.xml",
+                    "morphe_reload_video_bold.xml",
                 ),
             )
         }
@@ -96,8 +97,15 @@ val reloadVideoPatch = bytecodePatch(
                 "invoke-static/range { p0 .. p0 }, $EXTENSION_CLASS_DESCRIPTOR->setMainActivity(Landroid/app/Activity;)V"
             )
 
-            val dismissPlayerInnerMethod = MiniAppOpenYtContentCommandEndpointFingerprint
-                .instructionMatches[2]
+            // modified by lavinhoque33, 2026-10-04
+            // YouTube 21.39 moved the dismiss player call; try the old shape first, then the new one.
+            val dismissPlayerInnerMethod = runCatching {
+                MiniAppOpenYtContentCommandEndpointFingerprint
+                    .instructionMatches[2]
+                    .getInstruction<ReferenceInstruction>()
+                    .getReference<MethodReference>()!!
+            }.getOrNull() ?: MiniAppOpenYtContentCommandEndpointFingerprint2139
+                .instructionMatches.last()
                 .getInstruction<ReferenceInstruction>()
                 .getReference<MethodReference>()!!
 

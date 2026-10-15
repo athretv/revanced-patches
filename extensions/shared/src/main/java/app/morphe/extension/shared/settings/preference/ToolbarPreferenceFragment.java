@@ -1,3 +1,13 @@
+/*
+ * Copyright 2026 Morphe.
+ * https://github.com/MorpheApp/morphe-patches
+ *
+ * Original hard forked code:
+ * https://github.com/ReVanced/revanced-patches/commit/724e6d61b2ecd868c1a9a37d465a688e83a74799
+ *
+ * See the included NOTICE file for GPLv3 Section 7 terms that apply to Morphe contributions.
+ */
+
 package app.morphe.extension.shared.settings.preference;
 
 import static app.morphe.extension.shared.patches.PatchStatus.PatchVersion;
@@ -29,6 +39,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Objects;
 
+import app.morphe.extension.shared.patches.BaseAppRefreshRatePatch;
 import app.morphe.extension.shared.settings.BaseHostActivity;
 import app.morphe.extension.shared.settings.BaseSettings;
 import app.morphe.extension.shared.settings.Setting;
@@ -67,13 +78,28 @@ public class ToolbarPreferenceFragment extends AbstractPreferenceFragment {
                             // Fix the system navigation bar color for submenus.
                             BaseThemeUtils.setNavigationBarColor(preferenceScreenDialog.getWindow());
 
+                            // Set the refresh rate for submenus.
+                            BaseAppRefreshRatePatch.setWindowRefreshRate(
+                                    childScreen.getContext(),
+                                    preferenceScreenDialog.getWindow()
+                            );
+
                             // Fix edge-to-edge screen with Android 15 and YT 19.44+
                             // https://developer.android.com/develop/ui/views/layout/edge-to-edge#system-bars-insets
                             if (isEdgeToEdgeSupported) {
                                 rootView.setOnApplyWindowInsetsListener((v, insets) -> {
                                     Insets statusInsets = insets.getInsets(WindowInsets.Type.statusBars());
                                     Insets navInsets = insets.getInsets(WindowInsets.Type.navigationBars());
-                                    v.setPadding(0, statusInsets.top, 0, navInsets.bottom);
+                                    Insets cutoutInsets = insets.getInsets(WindowInsets.Type.displayCutout());
+
+                                    // Apply padding for display cutout in landscape,
+                                    // and in portrait if the status bar is hidden.
+                                    int leftPadding = cutoutInsets.left;
+                                    int rightPadding = cutoutInsets.right;
+                                    int topPadding = Math.max(statusInsets.top, cutoutInsets.top);
+                                    int bottomPadding = navInsets.bottom;
+
+                                    v.setPadding(leftPadding, topPadding, rightPadding, bottomPadding);
                                     return insets;
                                 });
                             }
@@ -81,6 +107,7 @@ public class ToolbarPreferenceFragment extends AbstractPreferenceFragment {
                             Toolbar toolbar = new Toolbar(childScreen.getContext());
                             toolbar.setTitle(childScreen.getTitle());
                             toolbar.setNavigationIcon(BaseThemeUtils.getBackButtonDrawable());
+                            toolbar.setNavigationContentDescription(str("revanced_settings_navigate_up"));
                             toolbar.setNavigationOnClickListener(view -> preferenceScreenDialog.dismiss());
 
                             final int margin = Utils.dipToPixels(16);

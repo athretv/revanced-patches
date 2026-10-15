@@ -13,9 +13,13 @@ package app.morphe.patches.youtube.player.miniplayer.general
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.InstructionLocation.MatchAfterImmediately
 import app.morphe.patcher.InstructionLocation.MatchAfterWithin
+import app.morphe.patcher.anyInstruction
+import app.morphe.patcher.checkCast
 import app.morphe.patcher.fieldAccess
+import app.morphe.patcher.literal
 import app.morphe.patcher.methodCall
 import app.morphe.patcher.opcode
+import app.morphe.patcher.string
 import app.morphe.patches.shared.mapping.ResourceType
 import app.morphe.patches.shared.mapping.resourceLiteral
 import app.morphe.patches.youtube.utils.resourceid.floatyBarTopMargin
@@ -182,12 +186,71 @@ internal object MiniplayerHorizontalRepositionFingerprint : Fingerprint(
     accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
     returnType = "V",
     parameters = listOf("Landroid/graphics/Rect;"),
+    filters = listOf(
+        fieldAccess(
+            opcode = Opcode.IGET,
+            definingClass = "Landroid/graphics/Rect;",
+            name = "left"
+        )
+    )
 )
 
 internal object NextGenWatchLayoutOnInterceptTouchEventFingerprint : Fingerprint(
     definingClass = "Lcom/google/android/apps/youtube/app/watch/nextgenwatch/ui/NextGenWatchLayout;",
     name = "onInterceptTouchEvent",
     parameters = listOf("Landroid/view/MotionEvent;")
+)
+
+private object MiniplayerModernViewParentFingerprint : Fingerprint(
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "Ljava/lang/String;",
+    parameters = listOf(),
+    filters = listOf(
+        string("player_overlay_modern_mini_player_controls")
+    )
+)
+
+internal object MiniplayerModernCloseButtonFingerprint : Fingerprint(
+    classFingerprint = MiniplayerModernViewParentFingerprint,
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "L",
+    parameters = listOf(),
+    filters = listOf(
+        resourceLiteral(ResourceType.ID, "modern_miniplayer_close"),
+        checkCast("Landroid/widget/ImageView;")
+    )
+)
+
+internal object MiniplayerModernExpandButtonFingerprint : Fingerprint(
+    classFingerprint = MiniplayerModernViewParentFingerprint,
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "L",
+    parameters = listOf(),
+    filters = listOf(
+        resourceLiteral(ResourceType.ID, "modern_miniplayer_expand"),
+        checkCast("Landroid/widget/ImageView;")
+    )
+)
+
+internal object MiniplayerModernOverlayViewFingerprint : Fingerprint(
+    classFingerprint = MiniplayerModernViewParentFingerprint,
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    parameters = listOf(),
+    filters = listOf(
+        resourceLiteral(ResourceType.ID, "scrim_overlay"),
+        opcode(Opcode.MOVE_RESULT_OBJECT, MatchAfterWithin(5))
+    )
+)
+
+internal object MiniplayerModernActionButtonFingerprint : Fingerprint(
+    classFingerprint = MiniplayerModernViewParentFingerprint,
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "L",
+    parameters = listOf(),
+    filters = listOf(
+        resourceLiteral(ResourceType.ID, "modern_miniplayer_overlay_action_button"),
+        opcode(Opcode.MOVE_RESULT_OBJECT, MatchAfterWithin(5))
+    )
 )
 
 internal val miniplayerModernViewParentFingerprint = legacyFingerprint(
@@ -211,77 +274,12 @@ internal val miniplayerModernAddViewListenerFingerprint = legacyFingerprint(
 /**
  * Matches using the class found in [miniplayerModernViewParentFingerprint].
  */
-internal val miniplayerModernCloseButtonFingerprint = legacyFingerprint(
-    name = "miniplayerModernCloseButtonFingerprint",
-    returnType = "L",
-    accessFlags = AccessFlags.PUBLIC or AccessFlags.FINAL,
-    parameters = emptyList(),
-    literals = listOf(modernMiniPlayerClose),
-)
-
-/**
- * Matches using the class found in [miniplayerModernViewParentFingerprint].
- */
-internal val miniplayerModernExpandButtonFingerprint = legacyFingerprint(
-    name = "miniplayerModernExpandButtonFingerprint",
-    returnType = "L",
-    accessFlags = AccessFlags.PUBLIC or AccessFlags.FINAL,
-    parameters = emptyList(),
-    literals = listOf(modernMiniPlayerExpand),
-)
-
-/**
- * Matches using the class found in [miniplayerModernViewParentFingerprint].
- */
 internal val miniplayerModernExpandCloseDrawablesFingerprint = legacyFingerprint(
     name = "miniplayerModernExpandCloseDrawablesFingerprint",
     returnType = "V",
     accessFlags = AccessFlags.PUBLIC or AccessFlags.FINAL,
     parameters = listOf("L"),
     literals = listOf(ytOutlinePictureInPictureWhite),
-)
-
-/**
- * Matches using the class found in [miniplayerModernViewParentFingerprint].
- */
-internal val miniplayerModernForwardButtonFingerprint = legacyFingerprint(
-    name = "miniplayerModernForwardButtonFingerprint",
-    returnType = "L",
-    accessFlags = AccessFlags.PUBLIC or AccessFlags.FINAL,
-    parameters = emptyList(),
-    literals = listOf(modernMiniPlayerForwardButton),
-)
-
-/**
- * Matches using the class found in [miniplayerModernViewParentFingerprint].
- */
-internal val miniplayerModernOverlayViewFingerprint = legacyFingerprint(
-    name = "miniplayerModernOverlayViewFingerprint",
-    accessFlags = AccessFlags.PUBLIC or AccessFlags.FINAL,
-    parameters = emptyList(),
-    literals = listOf(scrimOverlay),
-)
-
-/**
- * Matches using the class found in [miniplayerModernViewParentFingerprint].
- */
-internal val miniplayerModernRewindButtonFingerprint = legacyFingerprint(
-    name = "miniplayerModernRewindButtonFingerprint",
-    returnType = "L",
-    accessFlags = AccessFlags.PUBLIC or AccessFlags.FINAL,
-    parameters = emptyList(),
-    literals = listOf(modernMiniPlayerRewindButton),
-)
-
-/**
- * Matches using the class found in [miniplayerModernViewParentFingerprint].
- */
-internal val miniplayerModernActionButtonFingerprint = legacyFingerprint(
-    name = "miniplayerModernActionButtonFingerprint",
-    returnType = "L",
-    accessFlags = AccessFlags.PUBLIC or AccessFlags.FINAL,
-    parameters = emptyList(),
-    literals = listOf(modernMiniPlayerOverlayActionButton),
 )
 
 internal val miniplayerMinimumSizeFingerprint = legacyFingerprint(
@@ -336,5 +334,67 @@ internal object MiniplayerSetIconsLegacyFingerprint : Fingerprint(
     filters = listOf(
         resourceLiteral(ResourceType.DRAWABLE, "yt_fill_pause_white_36"),
         resourceLiteral(ResourceType.DRAWABLE, "yt_fill_pause_black_36")
+    )
+)
+
+internal object ModernMiniplayerMinimumSizeFingerprint : Fingerprint(
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.CONSTRUCTOR),
+    filters = listOf(
+        resourceLiteral(ResourceType.DIMEN, "miniplayer_max_size"),
+        anyInstruction(
+            literal(192),
+            literal(192.0f),
+        ),
+        anyInstruction(
+            literal(128),
+            literal(128.0f),
+        ),
+    ),
+)
+
+// modified by lavinhoque33, 2026-10-04
+// 21.39: the miniplayer subtitle TextView is looked up lazily by the modern controls class,
+// replacing the old (View)V view listener used for hiding subtexts.
+internal object MiniplayerModernSubtitleTextFingerprint : Fingerprint(
+    filters = listOf(
+        resourceLiteral(ResourceType.ID, "modern_miniplayer_subtitle_text"),
+        checkCast("Landroid/widget/TextView;")
+    )
+)
+
+// modified by lavinhoque33, 2026-10-07
+// 21.39: the drag and drop flag is gone. The drag recogniser class is the only one with a (Context, L)
+// constructor that creates a GestureDetector with long press disabled and computes touch slop squares.
+internal object MiniplayerDragRecognizerFingerprint : Fingerprint(
+    classFingerprint = Fingerprint(
+        accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.CONSTRUCTOR),
+        parameters = listOf("Landroid/content/Context;", "L"),
+        filters = listOf(
+            methodCall(smali = "Landroid/view/GestureDetector;->setIsLongpressEnabled(Z)V"),
+            methodCall(smali = "Ljava/lang/Math;->pow(DD)D")
+        )
+    ),
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "Z",
+    parameters = listOf("Landroid/view/View;", "Landroid/view/MotionEvent;")
+)
+
+// modified by lavinhoque33, 2026-10-07
+// 21.39: the rounded corners flag is gone. Matches the method of the corner applier class that clips
+// a view to an outline and sets the outline provider, `(View, L)V` (the sibling with the same signature
+// does not call these directly).
+internal object MiniplayerRoundedCornersFingerprint : Fingerprint(
+    classFingerprint = Fingerprint(
+        accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.CONSTRUCTOR),
+        filters = listOf(
+            resourceLiteral(ResourceType.DIMEN, "miniplayer_corner_radius")
+        )
+    ),
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "V",
+    parameters = listOf("Landroid/view/View;", "L"),
+    filters = listOf(
+        methodCall(smali = "Landroid/view/View;->setClipToOutline(Z)V"),
+        methodCall(smali = "Landroid/view/View;->setOutlineProvider(Landroid/view/ViewOutlineProvider;)V")
     )
 )

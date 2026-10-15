@@ -1,6 +1,5 @@
 package app.morphe.patches.youtube.layout.translations
 
-import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.filePathOption
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.patch.stringOption
@@ -15,52 +14,29 @@ import app.morphe.patches.youtube.utils.settings.settingsPatch
 private val SUPPORTED_TRANSLATIONS = setOf(
     "ar",
     "az-rAZ",
-    "be-rBY",
-    "bg-rBG",
+    "bn",
     "cs-rCZ",
-    "da-rDK",
     "de-rDE",
     "el-rGR",
-    "en-rGB",
-    "en-rUS",
     "es-rES",
-    "es-rUS",
     "fa-rIR",
-    "fil-rPH",
     "fr-rFR",
-    "ga-rIE",
     "hu-rHU",
-    "id-rID",
     "in",
     "it-rIT",
     "iw-rIL",
     "ja-rJP",
     "ko-rKR",
-    "lo-rLA",
-    "my-rMM",
-    "nl-rNL",
-    "pa-rIN",
     "pl-rPL",
     "pt-rBR",
     "ru-rRU",
-    "sk-rSK",
-    "sv-rSE",
-    "ta-rIN",
+    "th-rTH",
     "tr-rTR",
     "uk-rUA",
-    "ur-rPK",
-    "uz-rUZ",
     "vi-rVN",
     "zh-rCN",
     "zh-rTW",
 )
-
-@Suppress("unused")
-val translationsBytecodePatch = bytecodePatch {
-    execute {
-        addPreference(TRANSLATIONS_FOR_YOUTUBE)
-    }
-}
 
 @Suppress("unused")
 val translationsPatch = resourcePatch(
@@ -68,7 +44,7 @@ val translationsPatch = resourcePatch(
     TRANSLATIONS_FOR_YOUTUBE.summary,
 ) {
     compatibleWith(COMPATIBILITY_YOUTUBE)
-    dependsOn(translationsBytecodePatch, settingsPatch)
+    dependsOn(settingsPatch)
 
     val customTranslations by filePathOption(
         key = "customTranslations",

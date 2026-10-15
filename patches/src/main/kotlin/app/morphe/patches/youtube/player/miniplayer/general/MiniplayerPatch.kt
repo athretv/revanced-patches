@@ -14,6 +14,7 @@ import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
 import app.morphe.patcher.extensions.InstructionExtensions.getInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.replaceInstruction
+import app.morphe.patcher.methodCall
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
@@ -30,10 +31,13 @@ import app.morphe.patches.youtube.utils.playservice.is_19_34_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_19_36_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_19_43_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_20_03_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_20_05_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_20_31_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_20_37_or_greater
-import app.morphe.patches.youtube.utils.playservice.is_20_38_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_21_04_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_21_17_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_21_29_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_21_32_or_greater
 import app.morphe.patches.youtube.utils.playservice.versionCheckPatch
 import app.morphe.patches.youtube.utils.resourceid.modernMiniPlayerClose
 import app.morphe.patches.youtube.utils.resourceid.modernMiniPlayerExpand
@@ -48,10 +52,14 @@ import app.morphe.patches.youtube.utils.settings.ResourceUtils.addPreference
 import app.morphe.patches.youtube.utils.settings.settingsPatch
 import app.morphe.util.addInstructionsAtControlFlowLabel
 import app.morphe.util.findInstructionIndicesReversedOrThrow
+import app.morphe.util.findFreeRegister
 import app.morphe.util.fingerprint.injectLiteralInstructionBooleanCall
+import app.morphe.util.fingerprint.matchOrNull
 import app.morphe.util.fingerprint.matchOrThrow
 import app.morphe.util.fingerprint.methodOrThrow
 import app.morphe.util.fingerprint.mutableClassOrThrow
+import app.morphe.util.fingerprint.resolvable
+import app.morphe.util.Utils.printWarn
 import app.morphe.util.getReference
 import app.morphe.util.getWalkerMethod
 import app.morphe.util.indexOfFirstInstruction
@@ -61,6 +69,7 @@ import com.android.tools.smali.dexlib2.AccessFlags
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
 import com.android.tools.smali.dexlib2.iface.Method
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.NarrowLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
@@ -73,8 +82,14 @@ import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
 private const val EXTENSION_CLASS_DESCRIPTOR =
     "$PLAYER_PATH/MiniplayerPatch;"
 
+private const val MINIMAL_EXTENSION_CLASS_DESCRIPTOR =
+    "$PLAYER_PATH/MinimalMiniplayerPatch;"
+
+private const val MINIMAL_BOUNDS_INTERFACE_DESCRIPTOR =
+    $$"$$PLAYER_PATH/MinimalMiniplayerPatch$MiniplayerBoundsController;"
+
 // YT uses "Miniplayer" without a space between 'mini' and 'player: https://support.google.com/youtube/answer/9162927.
-@Suppress("unused")
+@Suppress("unused", "DEPRECATION")
 val miniplayerPatch = bytecodePatch(
     MINIPLAYER.title,
     MINIPLAYER.summary,
@@ -149,42 +164,43 @@ val miniplayerPatch = bytecodePatch(
 
         // region Enable tablet miniplayer
 
-        miniplayerOverrideNoContextFingerprint.methodOrThrow(
-            miniplayerDimensionsCalculatorParentFingerprint
-        ).apply {
-            findReturnIndicesReversed().forEach { index ->
-                insertLegacyTabletMiniplayerOverride(
-                    index
-                )
-            }
-        }
-
-        // endregion
-
-        // region Legacy tablet Miniplayer hooks
-
-        miniplayerOverrideFingerprint.matchOrThrow().let {
-            it.method.apply {
-                val stringIndex = it.stringMatches.first().index
-                val walkerIndex = indexOfFirstInstructionOrThrow(stringIndex) {
-                    val reference = getReference<MethodReference>()
-                    reference?.returnType == "Z" &&
-                            reference.parameterTypes.size == 1 &&
-                            reference.parameterTypes.firstOrNull() == "Landroid/content/Context;"
+        // Parts of the YT code is removed in 20.37+ and the legacy player no longer works.
+        if (!is_20_37_or_greater) {
+            miniplayerOverrideNoContextFingerprint.methodOrThrow(
+                miniplayerDimensionsCalculatorParentFingerprint
+            ).apply {
+                findReturnIndicesReversed().forEach { index ->
+                    insertLegacyTabletMiniplayerOverride(
+                        index
+                    )
                 }
-                val walkerMethod = getWalkerMethod(walkerIndex)
+            }
 
-                walkerMethod.apply {
-                    findReturnIndicesReversed().forEach { index ->
-                        insertLegacyTabletMiniplayerOverride(
-                            index
-                        )
+            // endregion
+
+            // region Legacy tablet Miniplayer hooks
+
+            miniplayerOverrideFingerprint.matchOrThrow().let {
+                it.method.apply {
+                    val stringIndex = it.stringMatches.first().index
+                    val walkerIndex = indexOfFirstInstructionOrThrow(stringIndex) {
+                        val reference = getReference<MethodReference>()
+                        reference?.returnType == "Z" &&
+                                reference.parameterTypes.size == 1 &&
+                                reference.parameterTypes.firstOrNull() == "Landroid/content/Context;"
+                    }
+                    val walkerMethod = getWalkerMethod(walkerIndex)
+
+                    walkerMethod.apply {
+                        findReturnIndicesReversed().forEach { index ->
+                            insertLegacyTabletMiniplayerOverride(
+                                index
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        if (!is_20_37_or_greater || is_20_38_or_greater) {
             miniplayerResponseModelSizeCheckFingerprint.matchOrThrow().let {
                 it.method.insertLegacyTabletMiniplayerOverride(it.instructionMatches.last().index)
             }
@@ -202,7 +218,13 @@ val miniplayerPatch = bytecodePatch(
 
         // region Enable modern miniplayer
 
-        miniplayerModernConstructorFingerprint.mutableClassOrThrow().methods.forEach {
+        // modified by lavinhoque33, 2026-10-04
+        // 21.39: the modern miniplayer is always on and its config constructor (literal 45623000) with all the
+        // miniplayer feature flags was removed, so the flag/type overrides have nothing to hook.
+        // The settings that depended on the config class are hooked elsewhere below (or not shown) on 21.39.
+        val hasModernConstructor = miniplayerModernConstructorFingerprint.resolvable()
+
+        if (hasModernConstructor) miniplayerModernConstructorFingerprint.mutableClassOrThrow().methods.forEach {
             it.apply {
                 if (AccessFlags.CONSTRUCTOR.isSet(accessFlags)) {
                     val iPutIndex = indexOfFirstInstructionOrThrow {
@@ -221,29 +243,54 @@ val miniplayerPatch = bytecodePatch(
             }
         }
 
-        if (is_19_23_or_greater) {
+        if (is_19_23_or_greater && hasModernConstructor) {
             miniplayerModernConstructorFingerprint.injectLiteralInstructionBooleanCall(
                 MINIPLAYER_DRAG_DROP_FEATURE_KEY,
                 "$EXTENSION_CLASS_DESCRIPTOR->getMiniplayerDragAndDrop(Z)Z"
             )
             settingArray += "SETTINGS: MINIPLAYER_DRAG_AND_DROP"
+        } else if (is_19_23_or_greater) {
+            // modified by lavinhoque33, 2026-10-07
+            // 21.39: the drag and drop flag is gone, the drag recogniser is always registered.
+            // Disable it by consuming no touch events at the start of its touch handler.
+            val dragMatch = runCatching { MiniplayerDragRecognizerFingerprint.match() }.getOrNull()
+            if (dragMatch == null) {
+                printWarn("\"Enable drag and drop\" is not supported in this version. Use YouTube versions up to 21.39.")
+            } else {
+                dragMatch.method.addInstructionsWithLabels(
+                    0,
+                    """
+                        const/4 v0, 0x1
+                        invoke-static { v0 }, $EXTENSION_CLASS_DESCRIPTOR->getMiniplayerDragAndDrop(Z)Z
+                        move-result v0
+                        if-nez v0, :miniplayer_drag_enabled
+                        const/4 v0, 0x0
+                        return v0
+                        :miniplayer_drag_enabled
+                        nop
+                    """
+                )
+                settingArray += "SETTINGS: MINIPLAYER_DRAG_AND_DROP"
+            }
         }
 
         if (is_19_25_or_greater) {
-            miniplayerModernConstructorFingerprint.injectLiteralInstructionBooleanCall(
-                MINIPLAYER_MODERN_FEATURE_LEGACY_KEY,
-                "$EXTENSION_CLASS_DESCRIPTOR->getModernMiniplayerOverride(Z)Z"
-            )
+            if (hasModernConstructor) {
+                miniplayerModernConstructorFingerprint.injectLiteralInstructionBooleanCall(
+                    MINIPLAYER_MODERN_FEATURE_LEGACY_KEY,
+                    "$EXTENSION_CLASS_DESCRIPTOR->getModernMiniplayerOverride(Z)Z"
+                )
 
-            miniplayerModernConstructorFingerprint.injectLiteralInstructionBooleanCall(
-                MINIPLAYER_MODERN_FEATURE_KEY,
-                "$EXTENSION_CLASS_DESCRIPTOR->getModernFeatureFlagsActiveOverride(Z)Z"
-            )
+                miniplayerModernConstructorFingerprint.injectLiteralInstructionBooleanCall(
+                    MINIPLAYER_MODERN_FEATURE_KEY,
+                    "$EXTENSION_CLASS_DESCRIPTOR->getModernFeatureFlagsActiveOverride(Z)Z"
+                )
 
-            miniplayerModernConstructorFingerprint.injectLiteralInstructionBooleanCall(
-                MINIPLAYER_DOUBLE_TAP_FEATURE_KEY,
-                "$EXTENSION_CLASS_DESCRIPTOR->getMiniplayerDoubleTapAction(Z)Z"
-            )
+                miniplayerModernConstructorFingerprint.injectLiteralInstructionBooleanCall(
+                    MINIPLAYER_DOUBLE_TAP_FEATURE_KEY,
+                    "$EXTENSION_CLASS_DESCRIPTOR->getMiniplayerDoubleTapAction(Z)Z"
+                )
+            }
 
             if (!is_19_29_or_greater) {
                 settingArray += "SETTINGS: MINIPLAYER_DOUBLE_TAP_ACTION"
@@ -251,62 +298,142 @@ val miniplayerPatch = bytecodePatch(
         }
 
         if (is_19_26_or_greater) {
-            miniplayerModernConstructorFingerprint.methodOrThrow().apply {
-                val literalIndex = indexOfFirstLiteralInstructionOrThrow(
-                    MINIPLAYER_INITIAL_SIZE_FEATURE_KEY,
-                )
-                val targetIndex = indexOfFirstInstructionOrThrow(literalIndex, Opcode.LONG_TO_INT)
-                val register = getInstruction<OneRegisterInstruction>(targetIndex).registerA
+            if (!is_21_32_or_greater) {
+                miniplayerModernConstructorFingerprint.methodOrThrow().apply {
+                    val literalIndex = indexOfFirstLiteralInstructionOrThrow(
+                        MINIPLAYER_INITIAL_SIZE_FEATURE_KEY,
+                    )
+                    val targetIndex = indexOfFirstInstructionOrThrow(literalIndex, Opcode.LONG_TO_INT)
+                    val register = getInstruction<OneRegisterInstruction>(targetIndex).registerA
 
-                addInstructions(
-                    targetIndex + 1,
-                    """
-                        invoke-static { v$register }, $EXTENSION_CLASS_DESCRIPTOR->getMiniplayerDefaultSize(I)I
-                        move-result v$register
-                        """,
-                )
-            }
-
-            // Override a minimum size constant.
-            miniplayerMinimumSizeFingerprint.methodOrThrow().apply {
-                val index = indexOfFirstInstructionOrThrow {
-                    opcode == Opcode.CONST_16 &&
-                            (this as NarrowLiteralInstruction).narrowLiteral == 192
+                    addInstructions(
+                        targetIndex + 1,
+                        """
+                            invoke-static { v$register }, $EXTENSION_CLASS_DESCRIPTOR->getMiniplayerDefaultSize(I)I
+                            move-result v$register
+                            """,
+                    )
                 }
-                val register = getInstruction<OneRegisterInstruction>(index).registerA
 
-                // Smaller sizes can be used, but the miniplayer will always start in size 170 if set any smaller.
-                // The 170 initial limit probably could be patched to allow even smaller initial sizes,
-                // but 170 is already half the horizontal space and smaller does not seem useful.
-                replaceInstruction(index, "const/16 v$register, 170")
+                // Override a minimum size constant.
+                if (is_21_04_or_greater) {
+                    ModernMiniplayerMinimumSizeFingerprint.method.apply {
+                        val index = ModernMiniplayerMinimumSizeFingerprint.instructionMatches[1].index
+                        val register = getInstruction<OneRegisterInstruction>(index).registerA
+
+                        // Smaller sizes can be used, but the miniplayer will always start in size 170 if set any smaller.
+                        // The 170 initial limit probably could be patched to allow even smaller initial sizes,
+                        // but 170 is already half the horizontal space and smaller does not seem useful.
+                        replaceInstruction(index, "const/16 v$register, 170")
+                    }
+                } else miniplayerMinimumSizeFingerprint.methodOrThrow().apply {
+                    val index = indexOfFirstInstructionOrThrow {
+                        opcode == Opcode.CONST_16 &&
+                                (this as NarrowLiteralInstruction).narrowLiteral == 192
+                    }
+                    val register = getInstruction<OneRegisterInstruction>(index).registerA
+
+                    // Smaller sizes can be used, but the miniplayer will always start in size 170 if set any smaller.
+                    // The 170 initial limit probably could be patched to allow even smaller initial sizes,
+                    // but 170 is already half the horizontal space and smaller does not seem useful.
+                    replaceInstruction(index, "const/16 v$register, 170")
+                }
+
+                settingArray += "SETTINGS: MINIPLAYER_WIDTH_DIP"
+            } else if (!hasModernConstructor) {
+                // modified by lavinhoque33, 2026-10-07
+                // 21.39: the miniplayer config class holding the initial size flag is gone, so the default
+                // size is hooked in the bounds controller constructor. The same const register is reused for the
+                // minimum size (first DisplayMetrics call) and the initial width (second DisplayMetrics call),
+                // so the minimum is lowered to 170 and 192 is reloaded for the initial width, which is then overridden.
+                val sizeMatch = runCatching { ModernMiniplayerMinimumSizeFingerprint.match() }.getOrNull()
+                if (sizeMatch == null) {
+                    printWarn("\"Initial size\" is not supported in this version. Use YouTube versions up to 21.39.")
+                } else sizeMatch.method.apply {
+                    val minimumIndex = sizeMatch.instructionMatches[1].index
+                    val register = getInstruction<OneRegisterInstruction>(minimumIndex).registerA
+                    val minimumCallIndex = indexOfFirstInstructionOrThrow(minimumIndex + 1, Opcode.INVOKE_STATIC)
+                    val initialCallIndex = indexOfFirstInstructionOrThrow(minimumCallIndex + 1, Opcode.INVOKE_STATIC)
+
+                    // Must be done first, as it does not shift the indexes.
+                    replaceInstruction(minimumIndex, "const/16 v$register, 170")
+
+                    addInstructions(
+                        initialCallIndex,
+                        """
+                            const/16 v$register, 192
+                            invoke-static { v$register }, $EXTENSION_CLASS_DESCRIPTOR->getMiniplayerDefaultSize(I)I
+                            move-result v$register
+                        """
+                    )
+
+                    settingArray += "SETTINGS: MINIPLAYER_WIDTH_DIP"
+                }
             }
 
-            settingArray += "SETTINGS: MINIPLAYER_OVERLAY_BUTTONS_19_26"
-            settingArray += "SETTINGS: MINIPLAYER_WIDTH_DIP"
+            if (!is_21_29_or_greater) {
+                settingArray += "SETTINGS: MINIPLAYER_OVERLAY_BUTTONS_19_26"
+            }
         } else {
             settingArray += "SETTINGS: MINIPLAYER_OVERLAY_BUTTONS_19_25"
             settingArray += "SETTINGS: MINIPLAYER_REWIND_FORWARD"
         }
 
-        if (is_19_36_or_greater) {
+        if (is_19_36_or_greater && hasModernConstructor) {
             miniplayerModernConstructorFingerprint.injectLiteralInstructionBooleanCall(
                 MINIPLAYER_ROUNDED_CORNERS_FEATURE_KEY,
                 "$EXTENSION_CLASS_DESCRIPTOR->getRoundedCorners(Z)Z"
             )
 
             settingArray += "SETTINGS: MINIPLAYER_ROUNDED_CORNERS"
+        } else if (is_19_36_or_greater) {
+            // modified by lavinhoque33, 2026-10-07
+            // 21.39: the rounded corners flag is gone. The outline provider is chosen in a method of the
+            // corner applier class, so the non-rounded provider is used when the setting is off.
+            val roundedMatch = runCatching { MiniplayerRoundedCornersFingerprint.match() }.getOrNull()
+            if (roundedMatch == null) {
+                printWarn("\"Enable rounded corners\" is not supported in this version. Use YouTube versions up to 21.39.")
+            } else {
+                val outlineIndex = roundedMatch.instructionMatches[1].index
+                // The static non-rounded provider (view background outline) field has an obfuscated name.
+                val defaultOutlineField = roundedMatch.method.let { method ->
+                    method.getInstruction(
+                        method.indexOfFirstInstructionOrThrow {
+                            opcode == Opcode.SGET_OBJECT &&
+                                    getReference<FieldReference>()?.type == "Landroid/view/ViewOutlineProvider;"
+                        }
+                    ).getReference<FieldReference>()!!
+                }
+                roundedMatch.method.addInstructionsAtControlFlowLabel(
+                    outlineIndex,
+                    """
+                        const/4 v0, 0x1
+                        invoke-static { v0 }, $EXTENSION_CLASS_DESCRIPTOR->getRoundedCorners(Z)Z
+                        move-result v0
+                        if-nez v0, :miniplayer_rounded_corners
+                        const/4 v0, 0x0
+                        invoke-virtual { p1, v0 }, Landroid/view/View;->setClipToOutline(Z)V
+                        sget-object p0, $defaultOutlineField
+                        :miniplayer_rounded_corners
+                        nop
+                    """
+                )
+                settingArray += "SETTINGS: MINIPLAYER_ROUNDED_CORNERS"
+            }
         }
 
-        if (is_19_43_or_greater) {
+        if (is_20_05_or_greater) {
             miniplayerOnCloseHandlerFingerprint.injectLiteralInstructionBooleanCall(
                 MINIPLAYER_DISABLED_FEATURE_KEY,
                 "$EXTENSION_CLASS_DESCRIPTOR->getMiniplayerOnCloseHandler(Z)Z"
             )
 
-            miniplayerModernConstructorFingerprint.injectLiteralInstructionBooleanCall(
-                MINIPLAYER_HORIZONTAL_DRAG_FEATURE_KEY,
-                "$EXTENSION_CLASS_DESCRIPTOR->getHorizontalDrag(Z)Z"
-            )
+            if (hasModernConstructor) {
+                miniplayerModernConstructorFingerprint.injectLiteralInstructionBooleanCall(
+                    MINIPLAYER_HORIZONTAL_DRAG_FEATURE_KEY,
+                    "$EXTENSION_CLASS_DESCRIPTOR->getHorizontalDrag(Z)Z"
+                )
+            }
 
             val horizontalDragPlaybackCallbackClass = MiniplayerHorizontalDragPlaybackFingerprint
                 .instructionMatches[2].instruction.getReference<MethodReference>()!!.definingClass
@@ -340,23 +467,52 @@ val miniplayerPatch = bytecodePatch(
                 )
             }
 
+            // modified by lavinhoque33, 2026-10-07: the horizontal drag flag is gone in 21.39 and YouTube's
+            // built-in behaviour is on, so this hook is the only switch, and is always applied.
+            MiniplayerOffscreenHandlerFingerprint.let {
+                it.method.apply {
+                    val index = it.instructionMatches.last().index
+                    val register = findFreeRegister(index)
+
+                    addInstructionsWithLabels(
+                        index + 1,
+                        """
+                            invoke-static { }, $EXTENSION_CLASS_DESCRIPTOR->getHorizontalDrag()Z
+                            move-result v$register
+                            if-eqz v$register, :disable_offscreen_handler
+                            return-void
+                            :disable_offscreen_handler
+                            nop
+                        """
+                    )
+                }
+            }
+
             NextGenWatchLayoutOnInterceptTouchEventFingerprint.method.addInstruction(
                 0,
                 "invoke-static { p1 }, $EXTENSION_CLASS_DESCRIPTOR->" +
                         "enableOffScreenMiniplayerButtonPressed(Landroid/view/MotionEvent;)V"
             )
 
-            miniplayerModernConstructorFingerprint.injectLiteralInstructionBooleanCall(
-                MINIPLAYER_ANIMATED_EXPAND_FEATURE_KEY,
-                "$EXTENSION_CLASS_DESCRIPTOR->getMaximizeAnimation(Z)Z"
-            )
+            // modified by lavinhoque33, 2026-10-07: 21.39 has no miniplayer config constructor, so the
+            // maximize animation flag is gone, but horizontal drag is controlled by the offscreen handler hook above.
+            if (hasModernConstructor) {
+                miniplayerModernConstructorFingerprint.injectLiteralInstructionBooleanCall(
+                    MINIPLAYER_ANIMATED_EXPAND_FEATURE_KEY,
+                    "$EXTENSION_CLASS_DESCRIPTOR->getMaximizeAnimation(Z)Z"
+                )
+            }
 
             settingArray += "SETTINGS: MINIPLAYER_HORIZONTAL_DRAG"
             settingArray += "SETTINGS: MINIPLAYER_DISABLE_HORIZONTAL_DRAG_PLAYBACK"
             settingArray += "SETTINGS: MINIPLAYER_DISABLE_HORIZONTAL_REPOSITION"
         }
 
-        settingArray += if (is_20_03_or_greater) {
+        settingArray += if (is_21_29_or_greater) {
+            "SETTINGS: MINIPLAYER_TYPE_21_29"
+        } else if (is_20_37_or_greater) {
+            "SETTINGS: MINIPLAYER_TYPE_20_37"
+        } else if (is_20_03_or_greater) {
             "SETTINGS: MINIPLAYER_TYPE_20_03"
         } else if (is_19_43_or_greater) {
             "SETTINGS: MINIPLAYER_TYPE_19_43"
@@ -400,67 +556,57 @@ val miniplayerPatch = bytecodePatch(
 
         // endregion
 
-        // region Add hooks to hide tablet modern miniplayer buttons
+        // region Add hooks to hide modern miniplayer buttons.
 
-        listOf(
-            Triple(
-                miniplayerModernExpandButtonFingerprint,
-                modernMiniPlayerExpand,
-                "hideMiniplayerExpandClose"
-            ),
-            Triple(
-                miniplayerModernCloseButtonFingerprint,
-                modernMiniPlayerClose,
-                "hideMiniplayerExpandClose"
-            ),
-            Triple(
-                miniplayerModernActionButtonFingerprint,
-                modernMiniPlayerOverlayActionButton,
-                "hideMiniplayerActionButton"
-            ),
-            Triple(
-                miniplayerModernRewindButtonFingerprint,
-                modernMiniPlayerRewindButton,
-                "hideMiniplayerRewindForward"
-            ),
-            Triple(
-                miniplayerModernForwardButtonFingerprint,
-                modernMiniPlayerForwardButton,
-                "hideMiniplayerRewindForward"
-            ),
-            Triple(
-                miniplayerModernOverlayViewFingerprint,
-                scrimOverlay,
-                "adjustMiniplayerOpacity"
-            )
-        ).forEach { (fingerprint, literalValue, methodName) ->
-            fingerprint.methodOrThrow(miniplayerModernViewParentFingerprint).apply {
-                val literalIndex = indexOfFirstLiteralInstructionOrThrow(literalValue)
-                val checkCastIndex = indexOfFirstInstruction(literalIndex) {
-                    opcode == Opcode.CHECK_CAST &&
-                            getReference<TypeReference>()?.type == "Landroid/widget/ImageView;"
-                }
-                val viewIndex = if (checkCastIndex >= 0) {
-                    checkCastIndex
-                } else {
-                    indexOfFirstInstructionOrThrow(literalIndex, Opcode.MOVE_RESULT_OBJECT)
-                }
-                val viewRegister = getInstruction<OneRegisterInstruction>(viewIndex).registerA
+        val fingerprints = mutableListOf(
+            MiniplayerModernExpandButtonFingerprint to "hideMiniplayerExpandClose",
+            MiniplayerModernCloseButtonFingerprint to "hideMiniplayerExpandClose",
+            MiniplayerModernActionButtonFingerprint to "hideMiniplayerActionButton",
+        )
+        if (!is_21_29_or_greater) {
+            fingerprints += MiniplayerModernOverlayViewFingerprint to "adjustMiniplayerOpacity"
+        }
+        fingerprints.forEach { (fingerprint, methodName) ->
+            fingerprint.method.apply {
+                val index = fingerprint.instructionMatches.last().index
+                val register = getInstruction<OneRegisterInstruction>(index).registerA
 
                 addInstruction(
-                    viewIndex + 1,
-                    "invoke-static { v$viewRegister }, $EXTENSION_CLASS_DESCRIPTOR->$methodName(Landroid/view/View;)V"
+                    index + 1,
+                    "invoke-static { v$register }, $EXTENSION_CLASS_DESCRIPTOR->$methodName(Landroid/view/View;)V",
                 )
             }
         }
 
-        miniplayerModernAddViewListenerFingerprint.methodOrThrow(
-            miniplayerModernViewParentFingerprint
-        ).addInstruction(
-            0,
-            "invoke-static { p1 }, $EXTENSION_CLASS_DESCRIPTOR->" +
-                    "hideMiniplayerSubTexts(Landroid/view/View;)V",
-        )
+        // modified by lavinhoque33, 2026-10-04
+        // 21.39: the lazily created miniplayer views are wrapped by the controls class, and the (View)V
+        // listener that received every view is gone. Only the old listener is hooked if it still exists,
+        // otherwise the subtitle TextView is hooked where it is looked up.
+        val addViewListenerMethod = miniplayerModernAddViewListenerFingerprint
+            .matchOrNull(miniplayerModernViewParentFingerprint)?.method
+            ?.takeIf { it.name != "onViewAttachedToWindow" && it.name != "onViewDetachedFromWindow" }
+
+        if (addViewListenerMethod != null) {
+            addViewListenerMethod.addInstruction(
+                0,
+                "invoke-static { p1 }, $EXTENSION_CLASS_DESCRIPTOR->" +
+                        "hideMiniplayerSubTexts(Landroid/view/View;)V",
+            )
+        } else {
+            val subtitleMatch = runCatching { MiniplayerModernSubtitleTextFingerprint.match() }.getOrNull()
+            if (subtitleMatch != null) {
+                val index = subtitleMatch.instructionMatches.last().index
+                val register = subtitleMatch.method.getInstruction<OneRegisterInstruction>(index).registerA
+
+                subtitleMatch.method.addInstruction(
+                    index + 1,
+                    "invoke-static { v$register }, $EXTENSION_CLASS_DESCRIPTOR->" +
+                            "hideMiniplayerSubTexts(Landroid/view/View;)V",
+                )
+            } else {
+                printWarn("\"Hide subtexts\" is not supported in this version. Use YouTube versions up to 21.39.")
+            }
+        }
 
         // Modern 2 has a broken overlay subtitle view that is always present.
         // Modern 2 uses the same overlay controls as the regular video player,
@@ -481,7 +627,7 @@ val miniplayerPatch = bytecodePatch(
                                 ImmutableMethodParameter("Landroid/view/View;", annotations, null),
                                 ImmutableMethodParameter("I", annotations, null),
                                 ImmutableMethodParameter(
-                                    "Landroid/view/ViewGroup\$LayoutParams;",
+                                    $$"Landroid/view/ViewGroup$LayoutParams;",
                                     annotations,
                                     null
                                 ),
@@ -493,9 +639,9 @@ val miniplayerPatch = bytecodePatch(
                             MutableMethodImplementation(4),
                         ).toMutable().apply {
                             addInstructions(
-                                """
-                                    invoke-super { p0, p1, p2, p3 }, Landroid/view/ViewGroup;->addView(Landroid/view/View;ILandroid/view/ViewGroup${'$'}LayoutParams;)V
-                                    invoke-static { p1 }, $EXTENSION_CLASS_DESCRIPTOR->playerOverlayGroupCreated(Landroid/view/View;)V
+                                $$"""
+                                    invoke-super { p0, p1, p2, p3 }, Landroid/view/ViewGroup;->addView(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)V
+                                    invoke-static { p1 }, $$EXTENSION_CLASS_DESCRIPTOR->playerOverlayGroupCreated(Landroid/view/View;)V
                                     return-void
                                     """,
                             )
@@ -509,7 +655,7 @@ val miniplayerPatch = bytecodePatch(
 
         // region Fix minimal miniplayer using the wrong pause/play bold icons
 
-        if (is_20_31_or_greater) {
+        if (is_20_31_or_greater && !is_21_29_or_greater) {
             if (is_21_17_or_greater) {
                 // 21.17+ removed the code to set the non-bold miniplayer pause/play icon,
                 // and removed the non bold yt_fill_pause_white_36 icons.
@@ -549,7 +695,139 @@ val miniplayerPatch = bytecodePatch(
 
         // endregion
 
-        settingArray += "SETTINGS: MINIPLAYER_TYPE_MODERN"
+        // region Minimal miniplayer.
+
+        if (is_20_37_or_greater) {
+            MiniplayerLegacyControlsFingerprint.let {
+                it.method.apply {
+                    val index = it.instructionMatches.last().index
+                    val register = getInstruction<OneRegisterInstruction>(index).registerA
+
+                    addInstruction(
+                        index + 1,
+                        "invoke-static { v$register }, $MINIMAL_EXTENSION_CLASS_DESCRIPTOR->" +
+                                "setLegacyControls(Landroid/view/ViewGroup;)V"
+                    )
+                }
+            }
+
+            MiniplayerLegacyControlsVisibilityFingerprint.let {
+                it.method.apply {
+                    val index = it.instructionMatches[1].index
+                    val register = getInstruction<OneRegisterInstruction>(index).registerA
+
+                    addInstructions(
+                        index + 1,
+                        """
+                            invoke-static { v$register }, $MINIMAL_EXTENSION_CLASS_DESCRIPTOR->getLegacyControlsVisibility(I)I
+                            move-result v$register
+                        """
+                    )
+                }
+            }
+
+            // Exposed so the bar shape can be applied on demand. Only this setter runs the
+            // pass that lays the player out, the plain one records the rect and nothing redraws.
+            MiniplayerHorizontalRepositionFingerprint.let { fingerprint ->
+                fingerprint.classDef.apply {
+                    interfaces.add(MINIMAL_BOUNDS_INTERFACE_DESCRIPTOR)
+
+                    val setBounds = ImmutableMethod(
+                        type,
+                        "patch_setBounds",
+                        listOf(ImmutableMethodParameter("Landroid/graphics/Rect;", null, "bounds")),
+                        "V",
+                        AccessFlags.PUBLIC.value or AccessFlags.FINAL.value,
+                        null,
+                        null,
+                        MutableMethodImplementation(2)
+                    ).toMutable()
+
+                    setBounds.addInstructions(
+                        0,
+                        """
+                            invoke-virtual { p0, p1 }, ${fingerprint.method}
+                            return-void
+                        """
+                    )
+
+                    methods.add(setBounds)
+                }
+
+                fingerprint.method.addInstruction(
+                    0,
+                    "invoke-static { p0 }, $MINIMAL_EXTENSION_CLASS_DESCRIPTOR->" +
+                            "setBoundsController($MINIMAL_BOUNDS_INTERFACE_DESCRIPTOR)V"
+                )
+            }
+
+            // YouTube sets the action button icon together with its content description, which
+            // is the exact playback state at the moment it changes.
+            MiniplayerSetIconsFingerprint.let {
+                it.method.addInstruction(
+                    it.instructionMatches.first().index + 1,
+                    "invoke-static { p2 }, $MINIMAL_EXTENSION_CLASS_DESCRIPTOR->setPlaybackIcon(I)V"
+                )
+            }
+
+            // Only this method recalculates the rect the video is laid out with. Insert after
+            // the early return, so the unchanged rect is what gets compared.
+            MiniplayerHorizontalRepositionFingerprint.let {
+                it.method.apply {
+                    addInstructionsAtControlFlowLabel(
+                        it.instructionMatches.first().index,
+                        """
+                            invoke-static { p1 }, $MINIMAL_EXTENSION_CLASS_DESCRIPTOR->getMinimalBarBounds(Landroid/graphics/Rect;)Landroid/graphics/Rect;
+                            move-result-object p1
+                        """
+                    )
+                }
+            }
+
+            // Written on the rect itself rather than through its getter, because the field is
+            // also read directly, including while animating.
+            MiniplayerHorizontalRepositionFingerprint.method.apply {
+                findInstructionIndicesReversedOrThrow(
+                    methodCall(
+                        opcode = Opcode.INVOKE_STATIC,
+                        parameters = listOf("F", "Landroid/graphics/Rect;", "Landroid/graphics/Rect;"),
+                        returnType = "V"
+                    )
+                ).forEach { index ->
+                    val videoRect = getInstruction<FiveRegisterInstruction>(index).registerE
+
+                    addInstruction(
+                        index + 1,
+                        "invoke-static { v$videoRect }, $MINIMAL_EXTENSION_CLASS_DESCRIPTOR->" +
+                                "applyVideoRect(Landroid/graphics/Rect;)V"
+                    )
+                }
+            }
+
+            // Must run after the offscreen handler hook above, which patches the same method
+            // and uses instruction indexes that inserting here would shift.
+            MiniplayerOffscreenHandlerFingerprint.method.addInstructions(
+                0,
+                """
+                    invoke-static { p1, p2, p3, p4 }, $MINIMAL_EXTENSION_CLASS_DESCRIPTOR->getMiniplayerBounds(IIII)Landroid/graphics/Rect;
+                    move-result-object v0
+                    iget p1, v0, Landroid/graphics/Rect;->left:I
+                    iget p2, v0, Landroid/graphics/Rect;->top:I
+                    iget p3, v0, Landroid/graphics/Rect;->right:I
+                    iget p4, v0, Landroid/graphics/Rect;->bottom:I
+                """
+            )
+        }
+
+        // endregion
+
+        if (!is_21_29_or_greater) {
+            settingArray += "SETTINGS: MINIPLAYER_TYPE_MODERN"
+        }
+
+        if (is_20_37_or_greater) {
+            settingArray += "SETTINGS: MINIPLAYER_HIDE_TITLE"
+        }
 
         // region add settings
 

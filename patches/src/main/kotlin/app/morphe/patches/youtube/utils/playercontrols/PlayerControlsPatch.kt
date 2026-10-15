@@ -98,16 +98,19 @@ fun injectControl(
     topControl: Boolean = true,
     initialize: Boolean = true
 ) {
+    // Insert positions are resolved at call time: other hooks (such as the inlined feature flag
+    // overrides on YouTube 21.39) can add instructions to these methods after this patch executed,
+    // which made cached indices stale and placed the initialization before ViewStub.inflate().
     if (initialize) {
         // Injects the code to initialize the controls.
         if (topControl) {
             inflateTopControlMethod.addInstruction(
-                inflateTopControlInsertIndex++,
+                inflateTopControlMethod.indexOfFirstViewInflateOrThrow() + 2 + inflateTopControlCount++,
                 "invoke-static { v$inflateTopControlRegister }, $descriptor->initializeButton(Landroid/view/View;)V",
             )
         } else {
             inflateBottomControlMethod.addInstruction(
-                inflateBottomControlInsertIndex++,
+                inflateBottomControlMethod.indexOfFirstViewInflateOrThrow() + 2 + inflateBottomControlCount++,
                 "invoke-static { v$inflateBottomControlRegister }, $descriptor->initializeButton(Landroid/view/View;)V",
             )
         }
@@ -129,7 +132,8 @@ fun injectControl(
     )
 
     visibilityNegatedImmediateMethod.addInstruction(
-        visibilityNegatedImmediateInsertIndex++,
+        indexOfTranslationInstruction(visibilityNegatedImmediateMethod) + 1 +
+                visibilityNegatedImmediateCount++,
         "invoke-static { }, $descriptor->setVisibilityNegatedImmediate()V",
     )
 }
@@ -140,12 +144,18 @@ internal const val EXTENSION_CLASS_DESCRIPTOR =
 private const val EXTENSION_PLAYER_CONTROLS_VISIBILITY_HOOK_CLASS_DESCRIPTOR =
     "$UTILS_PATH/PlayerControlsVisibilityHookPatch;"
 
+private fun MutableMethod.indexOfFirstViewInflateOrThrow() = indexOfFirstInstructionOrThrow {
+    val reference = getReference<MethodReference>()
+    reference?.definingClass == "Landroid/view/ViewStub;" &&
+            reference.name == "inflate"
+}
+
 private lateinit var inflateTopControlMethod: MutableMethod
-private var inflateTopControlInsertIndex: Int = -1
+private var inflateTopControlCount: Int = 0
 private var inflateTopControlRegister: Int = -1
 
 private lateinit var inflateBottomControlMethod: MutableMethod
-private var inflateBottomControlInsertIndex: Int = -1
+private var inflateBottomControlCount: Int = 0
 private var inflateBottomControlRegister: Int = -1
 
 private lateinit var visibilityMethod: MutableMethod
@@ -158,7 +168,7 @@ private lateinit var visibilityImmediateMethod: MutableMethod
 private var visibilityImmediateInsertIndex: Int = 0
 
 private lateinit var visibilityNegatedImmediateMethod: MutableMethod
-private var visibilityNegatedImmediateInsertIndex: Int = 0
+private var visibilityNegatedImmediateCount: Int = 0
 
 val playerControlsPatch = bytecodePatch(
     description = "playerControlsPatch",
@@ -194,16 +204,8 @@ val playerControlsPatch = bytecodePatch(
             }
         }
 
-        motionEventFingerprint.methodOrThrow(youtubeControlsOverlayFingerprint).apply {
-            visibilityNegatedImmediateMethod = this
-            visibilityNegatedImmediateInsertIndex = indexOfTranslationInstruction(this) + 1
-        }
-
-        fun MutableMethod.indexOfFirstViewInflateOrThrow() = indexOfFirstInstructionOrThrow {
-            val reference = getReference<MethodReference>()
-            reference?.definingClass == "Landroid/view/ViewStub;" &&
-                    reference.name == "inflate"
-        }
+        visibilityNegatedImmediateMethod =
+            motionEventFingerprint.methodOrThrow(youtubeControlsOverlayFingerprint)
 
         playerBottomControlsInflateFingerprint.methodOrThrow().apply {
             inflateBottomControlMethod = this
@@ -211,7 +213,6 @@ val playerControlsPatch = bytecodePatch(
             val inflateReturnObjectIndex = indexOfFirstViewInflateOrThrow() + 1
             inflateBottomControlRegister =
                 getInstruction<OneRegisterInstruction>(inflateReturnObjectIndex).registerA
-            inflateBottomControlInsertIndex = inflateReturnObjectIndex + 1
         }
 
         playerTopControlsInflateFingerprint.methodOrThrow().apply {
@@ -220,7 +221,6 @@ val playerControlsPatch = bytecodePatch(
             val inflateReturnObjectIndex = indexOfFirstViewInflateOrThrow() + 1
             inflateTopControlRegister =
                 getInstruction<OneRegisterInstruction>(inflateReturnObjectIndex).registerA
-            inflateTopControlInsertIndex = inflateReturnObjectIndex + 1
         }
 
         visibilityMethod = controlsOverlayVisibilityFingerprint.methodOrThrow(
@@ -250,14 +250,16 @@ val playerControlsPatch = bytecodePatch(
             playerControlsExtensionHookListenersExistFingerprint.methodOrThrow()
         visibilityImmediateMethod = playerControlsExtensionHookFingerprint.methodOrThrow()
 
+        val playerBottomControlsExploderLayoutOverride =
+            "$EXTENSION_CLASS_DESCRIPTOR->usePlayerBottomControlsExploderLayout(Z)Z"
+
         // A/B test for a slightly different bottom overlay controls,
         // that uses layout file youtube_video_exploder_controls_bottom_ui_container.xml
-        // The change to support this is simple and only requires adding buttons to both layout files,
-        // but for now force this different layout off since it's still an experimental test.
+        // Use the alternate layout when bold player controls are enabled.
         if (is_19_36_or_greater) {
             playerBottomControlsExploderFeatureFlagFingerprint.injectLiteralInstructionBooleanCall(
                 PLAYER_BOTTOM_CONTROLS_EXPLODER_FEATURE_FLAG,
-                "0x0"
+                playerBottomControlsExploderLayoutOverride
             )
         }
 
@@ -279,22 +281,24 @@ val playerControlsPatch = bytecodePatch(
                         """,
                 )
             }
-        } else if (is_20_20_or_greater) { // Turn off a/b tests of ugly player buttons that don't match the style of custom player buttons.
+        } else if (is_20_20_or_greater) { // Use the bold player button style when bold icons are enabled.
+            // The flag is gone in YouTube 21.39. The bold button style is still applied through the flags below.
             playerControlsFullscreenLargeButtonsFeatureFlagFingerprint.injectLiteralInstructionBooleanCall(
                 PLAYER_CONTROLS_FULLSCREEN_LARGE_BUTTON_FEATURE_FLAG,
-                "0x0"
+                playerBottomControlsExploderLayoutOverride,
+                warnIfMissing = false
             )
 
             if (is_20_28_or_greater) {
                 playerControlsLargeOverlayButtonsFeatureFlagFingerprint.injectLiteralInstructionBooleanCall(
                     PLAYER_CONTROLS_FULLSCREEN_LARGE_OVERLAY_BUTTON_FEATURE_FLAG,
-                    "0x0"
+                    playerBottomControlsExploderLayoutOverride
                 )
 
                 if (is_20_30_or_greater) {
                     playerControlsButtonStrokeFeatureFlagFingerprint.injectLiteralInstructionBooleanCall(
                         PLAYER_CONTROLS_BUTTON_STROKE_FEATURE_FLAG,
-                        "0x0"
+                        playerBottomControlsExploderLayoutOverride
                     )
                 }
             }

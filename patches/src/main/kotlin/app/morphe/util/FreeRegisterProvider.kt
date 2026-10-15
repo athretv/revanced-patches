@@ -129,6 +129,20 @@ class FreeRegisterProvider internal constructor(
     }
 
     /**
+     * Returns a 4-bit free register (<= 15) and removes it from the available list.
+     *
+     * @return A free register number <= 15
+     * @throws IllegalStateException if no 4-bit free registers are available
+     */
+    fun getFreeRegister4Bit(): Int {
+        val register = freeRegisters.firstOrNull { it <= 15 }
+            ?: throw IllegalStateException("No 4-bit free registers available")
+        freeRegisters.remove(register)
+        allocatedFreeRegisters.add(register)
+        return register
+    }
+
+    /**
      * Returns all registers that have been allocated via [getFreeRegister].
      * This does not include the originally excluded registers.
      *
@@ -187,6 +201,7 @@ class FreeRegisterProvider internal constructor(
             MOVE_OBJECT_FROM16, MOVE_OBJECT_16, MOVE_RESULT, MOVE_RESULT_WIDE, MOVE_RESULT_OBJECT, MOVE_EXCEPTION,
             CONST, CONST_4, CONST_16, CONST_HIGH16, CONST_WIDE_16, CONST_WIDE_32,
             CONST_WIDE, CONST_WIDE_HIGH16, CONST_STRING, CONST_STRING_JUMBO,
+            CONST_CLASS, CONST_METHOD_HANDLE, CONST_METHOD_TYPE,
             IGET, IGET_WIDE, IGET_OBJECT, IGET_BOOLEAN, IGET_BYTE, IGET_CHAR, IGET_SHORT,
             IGET_VOLATILE, IGET_WIDE_VOLATILE, IGET_OBJECT_VOLATILE,
             SGET, SGET_WIDE, SGET_OBJECT, SGET_BOOLEAN, SGET_BYTE, SGET_CHAR, SGET_SHORT,

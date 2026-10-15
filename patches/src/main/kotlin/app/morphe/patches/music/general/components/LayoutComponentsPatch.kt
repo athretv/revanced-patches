@@ -69,9 +69,11 @@ import app.morphe.patches.music.utils.settings.ResourceUtils.updatePatchStatus
 import app.morphe.patches.music.utils.settings.addTextPreference
 import app.morphe.patches.music.utils.settings.addSwitchPreference
 import app.morphe.patches.music.utils.settings.settingsPatch
+import app.morphe.patches.shared.misc.settings.preference.InputType
 import app.morphe.patches.shared.litho.addLithoFilter
 import app.morphe.patches.shared.litho.lithoFilterPatch
 import app.morphe.util.fingerprint.injectLiteralInstructionBooleanCall
+import app.morphe.util.fingerprint.matchOrNull
 import app.morphe.util.fingerprint.matchOrThrow
 import app.morphe.util.fingerprint.methodOrThrow
 import app.morphe.util.fingerprint.mutableClassOrThrow
@@ -167,9 +169,18 @@ val layoutComponentsPatch = bytecodePatch(
 
         // region patch for hide history button
 
+        // modified by lavinhoque33, 2026-10-04
+        // 9.40: offline-tab menu has a different shape (history setVisible is the 3rd call), use fallback fingerprint
+        val offlineTabMatch = runCatching { HistoryMenuItemOfflineTabFingerprint.match() }.getOrNull()
+        val offlineTabFingerprint = if (offlineTabMatch != null) {
+            HistoryMenuItemOfflineTabFingerprint to 2
+        } else {
+            HistoryMenuItemOfflineTabV940Fingerprint to 4
+        }
+
         arrayOf(
             HistoryMenuItemFingerprint to 1,
-            HistoryMenuItemOfflineTabFingerprint to 2
+            offlineTabFingerprint
         ).forEach { (fingerprint, matchIndex) ->
             fingerprint.method.apply {
                 val insertIndex = fingerprint.instructionMatches[matchIndex].index
@@ -282,7 +293,13 @@ val layoutComponentsPatch = bytecodePatch(
             )
         }
 
-        tasteBuilderSyntheticFingerprint.matchOrThrow(tasteBuilderConstructorFingerprint).let {
+        // modified by lavinhoque33, 2026-10-04
+        // 9.40: synthetic bind method has different access flags, fall back to the 9.40 fingerprint
+        val tasteBuilderSyntheticMatch = runCatching {
+            tasteBuilderSyntheticFingerprint.matchOrNull(tasteBuilderConstructorFingerprint)
+        }.getOrNull() ?: tasteBuilderSyntheticV940Fingerprint.matchOrThrow(tasteBuilderConstructorFingerprint)
+
+        tasteBuilderSyntheticMatch.let {
             it.method.apply {
                 val insertIndex = it.instructionMatches.first().index
                 val insertRegister = getInstruction<OneRegisterInstruction>(insertIndex).registerA
@@ -332,7 +349,8 @@ val layoutComponentsPatch = bytecodePatch(
         addTextPreference(
             CategoryType.GENERAL,
             "revanced_custom_filter_strings",
-            "revanced_custom_filter"
+            "revanced_custom_filter",
+            inputType = InputType.TEXT_MULTI_LINE,
         )
         addSwitchPreference(
             CategoryType.GENERAL,

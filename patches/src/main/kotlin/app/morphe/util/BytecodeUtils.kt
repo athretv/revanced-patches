@@ -4,6 +4,7 @@ package app.morphe.util
 
 import app.morphe.patcher.Fingerprint
 import app.morphe.patcher.FingerprintBuilder
+import app.morphe.patcher.InstructionFilter
 import app.morphe.patcher.Match
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
@@ -213,6 +214,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.Instruction
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.WideLiteralInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction31i
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
@@ -239,12 +241,18 @@ fun parametersEqual(
     return true
 }
 
+private val moveOpcodes: EnumSet<Opcode> = EnumSet.of(
+    Opcode.MOVE, Opcode.MOVE_FROM16, Opcode.MOVE_16,
+    Opcode.MOVE_WIDE, Opcode.MOVE_WIDE_FROM16, Opcode.MOVE_WIDE_16,
+    Opcode.MOVE_OBJECT, Opcode.MOVE_OBJECT_FROM16, Opcode.MOVE_OBJECT_16
+)
+
 /**
  * Find the instruction index used for a toString() StringBuilder write of a given String name.
  *
- * @param fieldName The name of the field to find.  Partial matches are allowed.
+ * @param fieldName The name of the field to find. Partial matches are allowed.
  */
-private fun Method.findInstructionIndexFromToString(fieldName: String, isField: Boolean): Int {
+private fun Method.findInstructionIndexFromToString(fieldName: String, isField: Boolean) : Int {
     val stringIndex = indexOfFirstInstruction {
         val reference = getReference<StringReference>()
         reference?.string?.contains(fieldName) == true
@@ -258,7 +266,7 @@ private fun Method.findInstructionIndexFromToString(fieldName: String, isField: 
     val stringUsageIndex = indexOfFirstInstruction(stringIndex) {
         val reference = getReference<MethodReference>()
         reference?.definingClass == "Ljava/lang/StringBuilder;" &&
-                (this as? FiveRegisterInstruction)?.registerD == stringRegister
+                registersUsed.getOrNull(1) == stringRegister
     }
     if (stringUsageIndex < 0) {
         throw IllegalArgumentException("Could not find StringBuilder usage in: $this")
@@ -273,21 +281,22 @@ private fun Method.findInstructionIndexFromToString(fieldName: String, isField: 
         // Should never happen.
         throw IllegalArgumentException("Could not find StringBuilder append usage in: $this")
     }
-    var fieldUsageRegister = getInstruction<FiveRegisterInstruction>(fieldUsageIndex).registerD
+    val fieldUsageInstruction = getInstruction(fieldUsageIndex)
+    var fieldUsageRegister = fieldUsageInstruction.registersUsed.getOrElse(1) { fieldUsageInstruction.registersUsed[0] }
 
     // Look backwards up the method to find the instruction that sets the register.
     var fieldSetIndex = indexOfFirstInstructionReversedOrThrow(fieldUsageIndex - 1) {
         fieldUsageRegister == writeRegister
     }
 
-    // Some 'toString()' methods, despite using a StringBuilder,
-    // Convert the value via 'Object.toString()' or 'String.valueOf(object)' before appending it to the StringBuilder.
+    // Some 'toString()' methods, despite using a StringBuilder, Convert the value via
+    // 'Object.toString()' or 'String.valueOf(object)' before appending it to the StringBuilder.
     // In this case, the correct index cannot be found.
     // Additional validation is done to find the index of the correct field or method.
     //
-    // Only runs a maximum of 3 times to avoid getting stuck in a loop.
-    var loopCount = 3
-    while (loopCount > 0) {
+    // Check up to 3 method calls.
+    var checksLeft = 3
+    while (checksLeft > 0) {
         // If the field is a method call, then adjust from MOVE_RESULT to the method call.
         val fieldSetOpcode = getInstruction(fieldSetIndex).opcode
         if (fieldSetOpcode == MOVE_RESULT ||
@@ -297,7 +306,21 @@ private fun Method.findInstructionIndexFromToString(fieldName: String, isField: 
             fieldSetIndex--
         }
 
-        val fieldSetReference = getInstruction<ReferenceInstruction>(fieldSetIndex).reference
+        val fieldSetInstruction = getInstruction(fieldSetIndex)
+
+        // If the instruction is a register MOVE (e.g. move-object/16, move/16),
+        // trace backwards to find where the source register was set.
+        if (fieldSetInstruction is TwoRegisterInstruction &&
+            fieldSetInstruction.opcode in moveOpcodes
+        ) {
+            fieldUsageRegister = fieldSetInstruction.registerB
+            fieldSetIndex = indexOfFirstInstructionReversedOrThrow(fieldSetIndex - 1) {
+                fieldUsageRegister == writeRegister
+            }
+            continue
+        }
+
+        val fieldSetReference = fieldSetInstruction.getReference<Reference>()
 
         if (isField && fieldSetReference is FieldReference ||
             !isField && fieldSetReference is MethodReference
@@ -308,15 +331,16 @@ private fun Method.findInstructionIndexFromToString(fieldName: String, isField: 
             // Object.toString(), String.valueOf(object)
             fieldSetReference.returnType == "Ljava/lang/String;"
         ) {
-            fieldUsageRegister = getInstruction<FiveRegisterInstruction>(fieldSetIndex).registerC
+            // FiveRegister or RegisterRange instruction.
+            fieldUsageRegister = fieldSetInstruction.registersUsed[0]
 
             // Look backwards up the method to find the instruction that sets the register.
             fieldSetIndex = indexOfFirstInstructionReversedOrThrow(fieldSetIndex - 1) {
                 fieldUsageRegister == writeRegister
             }
-            loopCount--
+            checksLeft--
         } else {
-            throw IllegalArgumentException("Unknown reference: $fieldSetReference")
+            throw IllegalArgumentException("Unknown reference or instruction: $fieldSetInstruction")
         }
     }
 
@@ -879,6 +903,28 @@ fun Method.findInstructionIndicesReversedOrThrow(filter: Instruction.() -> Boole
 }
 
 /**
+ * @return A list of indices of the instructions in reverse order.
+ * _Returns an empty list if no indices are found_
+ */
+fun Method.findInstructionIndicesReversed(filter: InstructionFilter): List<Int> {
+    val method = this
+    return findInstructionIndicesReversed {
+        filter.matches(method, this)
+    }
+}
+
+/**
+ * @return A list of indices of the instructions in reverse order.
+ * @throws PatchException if no matching indices are found.
+ */
+fun Method.findInstructionIndicesReversedOrThrow(filter: InstructionFilter): List<Int> {
+    val indexes = findInstructionIndicesReversed(filter)
+    if (indexes.isEmpty()) throw PatchException("No matching instructions found in: $this")
+
+    return indexes
+}
+
+/**
  * @return An immutable list of indices of the opcode in reverse order.
  *  _Returns an empty list if no indices are found_
  * @see findInstructionIndicesReversedOrThrow
@@ -974,6 +1020,104 @@ fun BytecodePatchContext.forEachLiteralValueInstruction(
     }
 }
 
+/**
+ * Newer YouTube builds inline feature flag getters into every caller:
+ * `const-wide` flag, `invoke-* (…J…)Z` flag check, `move-result`.
+ * Calls [block] with the literal index for every such site, bottom-up within each method so
+ * earlier indices stay valid. Returns the number of sites found.
+ *
+ * Added by lavinhoque33 (2026-10-04) for experimental YouTube 21.39 support.
+ */
+fun BytecodePatchContext.forEachInlinedFeatureFlagSite(
+    literal: Long,
+    block: MutableMethod.(literalIndex: Int) -> Unit,
+): Int {
+    fun Method.inlinedFlagSiteIndices(): List<Int> {
+        val instructions = implementation?.instructions?.toList() ?: return emptyList()
+        return instructions.indices.filter { index ->
+            if ((instructions[index] as? WideLiteralInstruction)?.wideLiteral != literal) {
+                return@filter false
+            }
+            // The flag check call must follow shortly after, return boolean and take a long.
+            val invokeIndex = (index + 1..minOf(index + 3, instructions.lastIndex)).firstOrNull {
+                (instructions[it] as? ReferenceInstruction)?.reference is MethodReference
+            } ?: return@filter false
+            val reference = (instructions[invokeIndex] as ReferenceInstruction).reference as MethodReference
+            reference.returnType == "Z" &&
+                    reference.parameterTypes.any { it.toString() == "J" } &&
+                    instructions.getOrNull(invokeIndex + 1)?.opcode == MOVE_RESULT
+        }
+    }
+
+    // Collect first, mutate afterwards: mutating while iterating the class pool is unsafe.
+    val targets = buildList {
+        classDefForEach { classDef ->
+            classDef.methods.forEach { method ->
+                val indices = method.inlinedFlagSiteIndices()
+                if (indices.isNotEmpty()) add(Triple(classDef, method, indices))
+            }
+        }
+    }
+    targets.forEach { (classDef, method, indices) ->
+        val mutableMethod = mutableClassDefBy(classDef).findMutableMethodOf(method)
+        indices.asReversed().forEach { index -> mutableMethod.block(index) }
+    }
+    return targets.sumOf { it.third.size }
+}
+
+/**
+ * Overrides every inlined check of the feature flag [literal] with [extensionMethodDescriptor],
+ * skipping checks that are already overridden with the same method.
+ *
+ * Older YouTube builds read each flag through one getter, so hooking the getter covered every read.
+ * Newer builds (21.39+) inline the getter into several callers; call this after hooking the
+ * fingerprint match so the setting applies to all of them. Returns the number of checks hooked.
+ *
+ * Added by lavinhoque33, 2026-10-08.
+ */
+fun BytecodePatchContext.insertLiteralOverrideAtInlinedSites(
+    literal: Long,
+    extensionMethodDescriptor: String,
+): Int {
+    var patched = 0
+    forEachInlinedFeatureFlagSite(literal) { literalIndex ->
+        val moveResultIndex = indexOfFirstInstructionOrThrow(literalIndex, MOVE_RESULT)
+        val nextReference = implementation!!.instructions.elementAtOrNull(moveResultIndex + 1)
+            ?.getReference<MethodReference>()?.toString()
+        if (nextReference != extensionMethodDescriptor) {
+            insertLiteralOverride(literalIndex, extensionMethodDescriptor)
+            patched++
+        }
+    }
+    return patched
+}
+
+/**
+ * Constant value variant of [insertLiteralOverrideAtInlinedSites]: forces every inlined check of
+ * [literal] to [override], skipping checks that are already forced to a constant.
+ *
+ * Added by lavinhoque33, 2026-10-08.
+ */
+fun BytecodePatchContext.insertLiteralOverrideAtInlinedSites(
+    literal: Long,
+    override: Boolean,
+): Int {
+    var patched = 0
+    forEachInlinedFeatureFlagSite(literal) { literalIndex ->
+        val moveResultIndex = indexOfFirstInstructionOrThrow(literalIndex, MOVE_RESULT)
+        val register = getInstruction<OneRegisterInstruction>(moveResultIndex).registerA
+        val next = implementation!!.instructions.elementAtOrNull(moveResultIndex + 1)
+        val alreadyForced = next != null &&
+                next.opcode in setOf(CONST, CONST_4, CONST_16) &&
+                (next as OneRegisterInstruction).registerA == register
+        if (!alreadyForced) {
+            insertLiteralOverride(literalIndex, override)
+            patched++
+        }
+    }
+    return patched
+}
+
 context(_: BytecodePatchContext)
 fun Match.getWalkerMethod(offset: Int) =
     method.getWalkerMethod(offset)
@@ -1003,7 +1147,10 @@ fun addStaticFieldToExtension(
     fieldName: String,
     objectClass: String,
     smaliInstructions: String,
-    shouldAddConstructor: Boolean = true
+    shouldAddConstructor: Boolean = true,
+    // modified by lavinhoque33, 2026-10-05: optional filter for R8-merged classes (YouTube Music 9.40),
+    // where only some constructors create the object the extension needs. Default keeps all constructors.
+    constructorFilter: (Method) -> Boolean = { true }
 ): MutableMethod {
     val mutableClass = ctx.mutableClassDefBy { classDef -> classDef.type == className }
 
@@ -1035,7 +1182,7 @@ fun addStaticFieldToExtension(
 
     if (shouldAddConstructor) {
         findMethodsOrThrow(objectClass)
-            .filter { method -> MethodUtil.isConstructor(method) }
+            .filter { method -> MethodUtil.isConstructor(method) && constructorFilter(method) }
             .forEach { mutableMethod ->
                 mutableMethod.apply {
                     val initializeIndex = indexOfFirstInstructionOrThrow {
@@ -1130,10 +1277,17 @@ fun Method.cloneMutableAndPreserveParameters(
     return clonedMethod
 }
 
+/**
+ * Clone this method, optionally changing the class that owns the cloned method.
+ *
+ * The owner must be overridden when a clone is inserted into a different class,
+ * otherwise the generated DEX class data can refer to the original class.
+ */
 fun Method.cloneMutable(
     registerCount: Int = implementation?.registerCount ?: 0,
     clearImplementation: Boolean = false,
     name: String = this.name,
+    definingClass: String = this.definingClass,
     accessFlags: Int = this.accessFlags,
     parameters: List<MethodParameter> = this.parameters,
     returnType: String = this.returnType,

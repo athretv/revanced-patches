@@ -3,6 +3,10 @@
  * Copyright 2026 Morphe.
  * https://github.com/MorpheApp/morphe-patches
  *
+ * Portions of this file are modified by anddea:
+ * Copyright (C) 2026 anddea
+ * https://github.com/anddea/revanced-patches
+ *
  * Original hard forked code:
  * https://github.com/ReVanced/revanced-patches/commit/724e6d61b2ecd868c1a9a37d465a688e83a74799
  *
@@ -33,6 +37,7 @@ import app.morphe.patches.youtube.utils.playservice.is_20_02_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_20_10_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_20_26_or_greater
 import app.morphe.patches.youtube.utils.playservice.is_20_28_or_greater
+import app.morphe.patches.youtube.utils.playservice.is_21_13_or_greater
 import app.morphe.patches.youtube.utils.playservice.versionCheckPatch
 import app.morphe.patches.youtube.utils.resourceid.bar
 import app.morphe.patches.youtube.utils.resourceid.captionToggleContainer
@@ -42,9 +47,12 @@ import app.morphe.patches.youtube.utils.resourceid.horizontalCardList
 import app.morphe.patches.youtube.utils.resourceid.relatedChipCloudMargin
 import app.morphe.patches.youtube.utils.resourceid.sharedResourceIdPatch
 import app.morphe.patches.youtube.utils.settings.ResourceUtils.addPreference
+import app.morphe.patches.youtube.utils.proto.elementProtoParserHookPatch
+import app.morphe.patches.youtube.utils.proto.hookElement
 import app.morphe.patches.youtube.utils.settings.settingsPatch
 import app.morphe.util.REGISTER_TEMPLATE_REPLACEMENT
 import app.morphe.util.addInstructionsAtControlFlowLabel
+import app.morphe.util.findMutableClassOrThrow
 import app.morphe.util.findFreeRegister
 import app.morphe.util.fingerprint.injectLiteralInstructionViewCall
 import app.morphe.util.fingerprint.matchOrThrow
@@ -60,6 +68,7 @@ import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.StringReference
 
 private const val FEED_COMPONENTS_FILTER_CLASS_DESCRIPTOR =
@@ -68,6 +77,8 @@ private const val FEED_VIDEO_VIEWS_FILTER_CLASS_DESCRIPTOR =
     "$COMPONENTS_PATH/FeedVideoViewsFilter;"
 private const val KEYWORD_FILTER_CLASS_DESCRIPTOR =
     "$COMPONENTS_PATH/KeywordContentFilter;"
+private const val AISLIST_FILTER_CLASS_DESCRIPTOR =
+    "$COMPONENTS_PATH/AiSListFilter;"
 
 @Suppress("unused")
 val feedComponentsPatch = bytecodePatch(
@@ -82,10 +93,13 @@ val feedComponentsPatch = bytecodePatch(
         playerTypeHookPatch,
         sharedResourceIdPatch,
         settingsPatch,
+        elementProtoParserHookPatch,
         engagementPanelHookPatch,
         versionCheckPatch,
     )
     execute {
+        hookElement("$FEED_COMPONENTS_FILTER_CLASS_DESCRIPTOR->hidePageHeaderButtons([B)[B")
+
 
         // region patch for hide carousel shelf, subscriptions channel section, latest videos button
 
@@ -124,28 +138,56 @@ val feedComponentsPatch = bytecodePatch(
 
         // region patch for hide caption button
 
-        captionsButtonFingerprint.methodOrThrow().apply {
-            val constIndex = indexOfFirstLiteralInstructionOrThrow(captionToggleContainer)
-            val insertIndex = indexOfFirstInstructionReversedOrThrow(constIndex, Opcode.IF_EQZ)
-            val insertRegister = getInstruction<OneRegisterInstruction>(insertIndex).registerA
+        if (!is_21_13_or_greater) {
+            captionsButtonFingerprint.methodOrThrow().apply {
+                val constIndex = indexOfFirstLiteralInstructionOrThrow(captionToggleContainer)
+                val insertIndex = indexOfFirstInstructionReversedOrThrow(constIndex, Opcode.IF_EQZ)
+                val insertRegister = getInstruction<OneRegisterInstruction>(insertIndex).registerA
 
-            addInstructions(
-                insertIndex, """
-                    invoke-static {v$insertRegister}, $FEED_CLASS_DESCRIPTOR->hideCaptionsButton(Landroid/view/View;)Landroid/view/View;
-                    move-result-object v$insertRegister
-                    """
-            )
-        }
+                addInstructions(
+                    insertIndex, """
+                        invoke-static {v$insertRegister}, $FEED_CLASS_DESCRIPTOR->hideCaptionsButton(Landroid/view/View;)Landroid/view/View;
+                        move-result-object v$insertRegister
+                        """
+                )
+            }
 
-        captionsButtonSyntheticFingerprint.methodOrThrow().apply {
-            val constIndex = indexOfFirstLiteralInstructionOrThrow(captionToggleContainer)
-            val targetIndex = indexOfFirstInstructionOrThrow(constIndex, Opcode.MOVE_RESULT_OBJECT)
-            val targetRegister = getInstruction<OneRegisterInstruction>(targetIndex).registerA
+            captionsButtonSyntheticFingerprint.methodOrThrow().apply {
+                val constIndex = indexOfFirstLiteralInstructionOrThrow(captionToggleContainer)
+                val targetIndex = indexOfFirstInstructionOrThrow(constIndex, Opcode.MOVE_RESULT_OBJECT)
+                val targetRegister = getInstruction<OneRegisterInstruction>(targetIndex).registerA
 
-            addInstruction(
-                targetIndex + 1,
-                "invoke-static {v$targetRegister}, $FEED_CLASS_DESCRIPTOR->hideCaptionsButtonContainer(Landroid/view/View;)V"
-            )
+                addInstruction(
+                    targetIndex + 1,
+                    "invoke-static {v$targetRegister}, $FEED_CLASS_DESCRIPTOR->hideCaptionsButtonContainer(Landroid/view/View;)V"
+                )
+            }
+        } else {
+            ModernCaptionsButtonFingerprint.let {
+                it.method.apply {
+                    val insertIndex = it.instructionMatches.first().index
+                    val insertRegister = getInstruction<OneRegisterInstruction>(insertIndex).registerA
+
+                    addInstructions(
+                        insertIndex, """
+                            invoke-static {v$insertRegister}, $FEED_CLASS_DESCRIPTOR->hideCaptionsButton(Landroid/view/View;)Landroid/view/View;
+                            move-result-object v$insertRegister
+                            """
+                    )
+                }
+            }
+
+            ModernCaptionsButtonSyntheticFingerprint.let {
+                it.method.apply {
+                    val checkCastIndex = it.instructionMatches.last().index
+                    val insertRegister = getInstruction<OneRegisterInstruction>(checkCastIndex).registerA
+
+                    addInstruction(
+                        checkCastIndex + 1,
+                        "invoke-static {v$insertRegister}, $FEED_CLASS_DESCRIPTOR->hideCaptionsButtonContainer(Landroid/view/View;)V"
+                    )
+                }
+            }
         }
 
         // endregion
@@ -363,40 +405,134 @@ val feedComponentsPatch = bytecodePatch(
 
         // region patch for hide channel tab
 
-        val channelTabBuilderMethod =
+        // modified by lavinhoque33, 2026-10-04
+        // 21.39: the 4-parameter tab builder no longer exists (now has 5+ params), so it is optional.
+        val channelTabBuilderMethod = runCatching {
             channelTabBuilderFingerprint.methodOrThrow()
+        }.getOrNull()
 
         channelTabRendererFingerprint.matchOrThrow().let {
             it.method.apply {
-                val iteratorIndex = indexOfFirstInstructionOrThrow {
-                    getReference<MethodReference>()?.name == "hasNext"
+                val channelTabMatch = it.instructionMatches[1]
+                val selectedIndexRegister = channelTabMatch.getInstruction<FiveRegisterInstruction>().registerD
+
+                addInstructions(
+                    channelTabMatch.index,
+                    """
+                        invoke-static { v$selectedIndexRegister }, $FEED_CLASS_DESCRIPTOR->getChannelTabSelectedIndex(I)I
+                        move-result v$selectedIndexRegister
+                    """
+                )
+
+                val iteratorIndex = if (is_21_13_or_greater) {
+                    indexOfFirstInstructionReversedOrThrow {
+                        getReference<MethodReference>()?.name == "hasNext"
+                    }
+                } else {
+                    indexOfFirstInstructionOrThrow {
+                        getReference<MethodReference>()?.name == "hasNext"
+                    }
                 }
                 val iteratorRegister =
                     getInstruction<FiveRegisterInstruction>(iteratorIndex).registerC
 
-                val targetIndex = indexOfFirstInstructionOrThrow {
-                    val reference = ((this as? ReferenceInstruction)?.reference as? MethodReference)
+                if (channelTabBuilderMethod != null) {
+                    val targetIndex = indexOfFirstInstructionOrThrow {
+                        val reference = ((this as? ReferenceInstruction)?.reference as? MethodReference)
 
-                    opcode == Opcode.INVOKE_INTERFACE &&
-                            reference?.returnType == channelTabBuilderMethod.returnType &&
-                            reference.parameterTypes == channelTabBuilderMethod.parameterTypes
+                        opcode == Opcode.INVOKE_INTERFACE &&
+                                reference?.returnType == channelTabBuilderMethod.returnType &&
+                                reference.parameterTypes == channelTabBuilderMethod.parameterTypes
+                    }
+
+                    val objectIndex =
+                        indexOfFirstInstructionReversedOrThrow(targetIndex, Opcode.IGET_OBJECT)
+                    val objectInstruction = getInstruction<TwoRegisterInstruction>(objectIndex)
+                    val objectReference = getInstruction<ReferenceInstruction>(objectIndex).reference
+
+                    addInstructionsWithLabels(
+                        objectIndex + 1, """
+                            invoke-static {v${objectInstruction.registerA}}, $FEED_CLASS_DESCRIPTOR->hideChannelTab(Ljava/lang/String;)Z
+                            move-result v${objectInstruction.registerA}
+                            if-eqz v${objectInstruction.registerA}, :ignore
+                            invoke-interface {v$iteratorRegister}, Ljava/util/Iterator;->remove()V
+                            goto :next_iterator
+                            :ignore
+                            iget-object v${objectInstruction.registerA}, v${objectInstruction.registerB}, $objectReference
+                            """, ExternalLabel("next_iterator", getInstruction(iteratorIndex))
+                    )
+                } else {
+                    // modified by lavinhoque33, 2026-10-04
+                    // 21.39: the tab view builder call moved out of this method into a per-tab
+                    // handler method `handler(TabItem, int, X)V` that is invoked inside the iterator loop.
+                    // The builder signature also changed, so hook the loop call site instead.
+                    val handlerCallIndex = indexOfFirstInstructionOrThrow {
+                        val ref = getReference<MethodReference>()
+                        opcode == Opcode.INVOKE_VIRTUAL &&
+                                ref?.definingClass == definingClass &&
+                                ref.returnType == "V" &&
+                                ref.parameterTypes.size == 3 &&
+                                ref.parameterTypes[1].toString() == "I"
+                    }
+                    val handlerRef = getInstruction<ReferenceInstruction>(handlerCallIndex).reference as MethodReference
+                    val handlerMethod = findMutableClassOrThrow(definingClass).methods.first { m ->
+                        m.name == handlerRef.name &&
+                                m.parameterTypes.map { p -> p.toString() } ==
+                                handlerRef.parameterTypes.map { p -> p.toString() }
+                    }
+
+                    val builderCallIndex = handlerMethod.indexOfFirstInstructionOrThrow {
+                        val ref = getReference<MethodReference>()
+                        (opcode == Opcode.INVOKE_INTERFACE || opcode == Opcode.INVOKE_INTERFACE_RANGE) &&
+                                ref?.returnType == "Landroid/view/View;" &&
+                                ref.parameterTypes.size >= 3 &&
+                                ref.parameterTypes[0].toString() == "Ljava/lang/CharSequence;" &&
+                                ref.parameterTypes[1].toString() == "Ljava/lang/CharSequence;" &&
+                                ref.parameterTypes[2].toString() == "Z"
+                    }
+                    val nameFieldIndex = handlerMethod.indexOfFirstInstructionReversedOrThrow(
+                        builderCallIndex,
+                        Opcode.IGET_OBJECT
+                    )
+                    val nameFieldRef = handlerMethod
+                        .getInstruction<ReferenceInstruction>(nameFieldIndex).reference as FieldReference
+
+                    val tabRegister = getInstruction<FiveRegisterInstruction>(handlerCallIndex).registerD
+                    val tabFieldIndex = indexOfFirstInstructionOrThrow {
+                        val ref = getReference<FieldReference>()
+                        opcode == Opcode.IGET_OBJECT &&
+                                ref?.type == nameFieldRef.definingClass &&
+                                (this as TwoRegisterInstruction).registerB == tabRegister
+                    }
+                    val tabFieldInstruction = getInstruction<TwoRegisterInstruction>(tabFieldIndex)
+                    val tabFieldReference = getInstruction<ReferenceInstruction>(tabFieldIndex).reference
+                    val scratchRegister = tabFieldInstruction.registerA
+
+                    addInstructionsWithLabels(
+                        handlerCallIndex, """
+                            iget-object v$scratchRegister, v$tabRegister, $tabFieldReference
+                            iget-object v$scratchRegister, v$scratchRegister, $nameFieldRef
+                            invoke-static {v$scratchRegister}, $FEED_CLASS_DESCRIPTOR->hideChannelTab(Ljava/lang/String;)Z
+                            move-result v$scratchRegister
+                            if-eqz v$scratchRegister, :ignore
+                            invoke-interface {v$iteratorRegister}, Ljava/util/Iterator;->remove()V
+                            goto :next_iterator
+                            :ignore
+                            nop
+                            """, ExternalLabel("next_iterator", getInstruction(iteratorIndex))
+                    )
                 }
 
-                val objectIndex =
-                    indexOfFirstInstructionReversedOrThrow(targetIndex, Opcode.IGET_OBJECT)
-                val objectInstruction = getInstruction<TwoRegisterInstruction>(objectIndex)
-                val objectReference = getInstruction<ReferenceInstruction>(objectIndex).reference
+                val addAllIndex = indexOfFirstInstructionOrThrow {
+                    val ref = getReference<MethodReference>()
+                    ref?.name == "addAll" && ref.parameterTypes.size == 1
+                }
+                val addAllInstruction = getInstruction<FiveRegisterInstruction>(addAllIndex)
 
-                addInstructionsWithLabels(
-                    objectIndex + 1, """
-                        invoke-static {v${objectInstruction.registerA}}, $FEED_CLASS_DESCRIPTOR->hideChannelTab(Ljava/lang/String;)Z
-                        move-result v${objectInstruction.registerA}
-                        if-eqz v${objectInstruction.registerA}, :ignore
-                        invoke-interface {v$iteratorRegister}, Ljava/util/Iterator;->remove()V
-                        goto :next_iterator
-                        :ignore
-                        iget-object v${objectInstruction.registerA}, v${objectInstruction.registerB}, $objectReference
-                        """, ExternalLabel("next_iterator", getInstruction(iteratorIndex))
+                addInstruction(
+                    addAllIndex,
+                    "invoke-static { v${addAllInstruction.registerC}, v${addAllInstruction.registerD} }, " +
+                            "$FEED_CLASS_DESCRIPTOR->setChannelTabs(Ljava/util/List;Ljava/util/List;)V"
                 )
             }
         }
@@ -406,6 +542,7 @@ val feedComponentsPatch = bytecodePatch(
         addLithoFilter(FEED_COMPONENTS_FILTER_CLASS_DESCRIPTOR)
         addLithoFilter(FEED_VIDEO_VIEWS_FILTER_CLASS_DESCRIPTOR)
         addLithoFilter(KEYWORD_FILTER_CLASS_DESCRIPTOR)
+        addLithoFilter(AISLIST_FILTER_CLASS_DESCRIPTOR)
 
         // region add settings
 

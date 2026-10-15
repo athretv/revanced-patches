@@ -8,9 +8,8 @@ import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from defusedxml import ElementTree as DefusedET
-
 from config.settings import Settings
+from defusedxml import ElementTree as DefusedET
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -41,12 +40,16 @@ def extract_string_texts(path: Path) -> dict[str, str]:
 
 
 def find_duplicate_strings(path: Path) -> dict[str, list[str]]:
-    """Find string names that share the same text content."""
+    """Find duplicate text so callers reuse a single string resource without exemptions."""
     names_by_text: defaultdict[str, list[str]] = defaultdict(list)
     for name, text in extract_string_texts(path).items():
         names_by_text[text].append(name)
 
-    return {text: names for text, names in names_by_text.items() if len(names) > 1}
+    return {
+        text: names
+        for text, names in names_by_text.items()
+        if len(names) > 1
+    }
 
 
 def _get_strings_path(app: str) -> Path:

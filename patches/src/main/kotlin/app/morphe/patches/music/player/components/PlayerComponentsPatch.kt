@@ -50,6 +50,8 @@
 package app.morphe.patches.music.player.components
 
 import app.morphe.patcher.Fingerprint
+import app.morphe.patcher.InstructionLocation.MatchAfterWithin
+import app.morphe.patcher.fieldAccess
 import app.morphe.patcher.extensions.InstructionExtensions.addInstruction
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructions
 import app.morphe.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
@@ -61,6 +63,8 @@ import app.morphe.patcher.patch.ResourcePatchContext
 import app.morphe.patcher.patch.booleanOption
 import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.resourcePatch
+import app.morphe.patcher.methodCall
+import app.morphe.patcher.string
 import app.morphe.patcher.util.proxy.mutableTypes.MutableField.Companion.toMutable
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod
 import app.morphe.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
@@ -103,6 +107,8 @@ import app.morphe.patches.shared.comments.commentsPanelPatch
 import app.morphe.patches.shared.litho.addLithoFilter
 import app.morphe.patches.shared.litho.lithoFilterPatch
 import app.morphe.patches.shared.mainactivity.getMainActivityMethod
+import app.morphe.patches.shared.mapping.ResourceType
+import app.morphe.patches.shared.mapping.resourceLiteral
 import app.morphe.util.REGISTER_TEMPLATE_REPLACEMENT
 import app.morphe.util.Utils.printWarn
 import app.morphe.util.addInstructionsAtControlFlowLabel
@@ -141,6 +147,8 @@ import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import com.android.tools.smali.dexlib2.iface.reference.Reference
+import com.android.tools.smali.dexlib2.iface.reference.TypeReference
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethod
 import com.android.tools.smali.dexlib2.immutable.ImmutableField
 import com.android.tools.smali.dexlib2.immutable.ImmutableMethodParameter
@@ -154,6 +162,37 @@ private const val PREVIOUS_BUTTON_VIEW_ID =
     "mini_player_previous_button"
 private const val COLOR_PICKER_PREFERENCE_TAG =
     "app.morphe.extension.shared.settings.preference.ColorPickerPreference"
+
+/** Matches the TabLayout method that assigns the navigation bar background color. */
+private object ChangeMiniplayerColorNavigationBarFingerprint : Fingerprint(
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    returnType = "V",
+    parameters = emptyList(),
+    filters = listOf(
+        string("FEmusic_radio_builder"),
+        resourceLiteral(ResourceType.COLOR, "ytm_color_grey_12"),
+        methodCall(name = "setBackgroundColor")
+    )
+)
+
+/** Matches the watch-while callback that clears the miniplayer after dismissal. */
+private fun watchWhileDismissedFingerprint(musicActivityPeerClass: String) = Fingerprint(
+    accessFlags = listOf(AccessFlags.PUBLIC, AccessFlags.FINAL),
+    parameters = emptyList(),
+    returnType = "V",
+    filters = listOf(
+        fieldAccess(
+            opcode = Opcode.IGET_OBJECT,
+            definingClass = musicActivityPeerClass,
+            type = "Ljava/util/concurrent/atomic/AtomicBoolean;"
+        ),
+        methodCall(
+            opcode = Opcode.INVOKE_VIRTUAL,
+            smali = "Ljava/util/concurrent/atomic/AtomicBoolean;->set(Z)V",
+            location = MatchAfterWithin(3)
+        )
+    )
+)
 
 private fun MutableMethod.hookPlayerBackgroundColor() {
     val index = indexOfFirstInstructionOrThrow(Opcode.FILLED_NEW_ARRAY)
@@ -197,8 +236,17 @@ private val playerComponentsResourcePatch = resourcePatch(
     }
 }
 
+// modified by lavinhoque33, 2026-10-04
+// 9.40: music_player_next/prev drawables no longer exist; pick an existing drawable.
 private fun ResourcePatchContext.insertNode(isPreviousButton: Boolean) {
     var shouldAddPreviousButton = true
+    val drawableName = if (isPreviousButton) {
+        if (get("res/drawable/music_player_prev.xml").exists()) "music_player_prev"
+        else "quantum_ic_skip_previous_white_36"
+    } else {
+        if (get("res/drawable/music_player_next.xml").exists()) "music_player_next"
+        else "quantum_ic_skip_next_white_36"
+    }
 
     document("res/layout/watch_while_layout.xml").use { document ->
         document.doRecursively loop@{ node ->
@@ -210,14 +258,14 @@ private fun ResourcePatchContext.insertNode(isPreviousButton: Boolean) {
                         shouldAddPreviousButton
                     ) {
                         node.insertNode(IMAGE_VIEW_TAG_NAME, node) {
-                            setPreviousButtonNodeAttribute()
+                            setPreviousButtonNodeAttribute(drawableName)
                         }
                         shouldAddPreviousButton = false
                     }
                 } else {
                     if (attribute.textContent == "@id/mini_player") {
                         node.adoptChild(IMAGE_VIEW_TAG_NAME) {
-                            setNextButtonNodeAttribute()
+                            setNextButtonNodeAttribute(drawableName)
                         }
                     }
                 }
@@ -226,13 +274,15 @@ private fun ResourcePatchContext.insertNode(isPreviousButton: Boolean) {
     }
 }
 
-private fun Element.setNextButtonNodeAttribute() {
+private fun Element.setNextButtonNodeAttribute(drawableName: String) {
     mapOf(
         "android:id" to "@id/$NEXT_BUTTON_VIEW_ID",
         "android:padding" to "@dimen/item_medium_spacing",
         "android:layout_width" to "@dimen/remix_generic_button_size",
         "android:layout_height" to "@dimen/remix_generic_button_size",
-        "android:src" to "@drawable/music_player_next",
+        // modified by lavinhoque33, 2026-10-04
+        // 9.40: music_player_next was removed; fall back to quantum_ic_skip_next_white_36.
+        "android:src" to "@drawable/$drawableName",
         "android:scaleType" to "fitCenter",
         "android:contentDescription" to "@string/accessibility_next",
         "style" to "@style/MusicPlayerButton"
@@ -241,13 +291,15 @@ private fun Element.setNextButtonNodeAttribute() {
     }
 }
 
-private fun Element.setPreviousButtonNodeAttribute() {
+private fun Element.setPreviousButtonNodeAttribute(drawableName: String) {
     mapOf(
         "android:id" to "@id/$PREVIOUS_BUTTON_VIEW_ID",
         "android:padding" to "@dimen/item_medium_spacing",
         "android:layout_width" to "@dimen/remix_generic_button_size",
         "android:layout_height" to "@dimen/remix_generic_button_size",
-        "android:src" to "@drawable/music_player_prev",
+        // modified by lavinhoque33, 2026-10-04
+        // 9.40: music_player_prev was removed; fall back to quantum_ic_skip_previous_white_36.
+        "android:src" to "@drawable/$drawableName",
         "android:scaleType" to "fitCenter",
         "android:contentDescription" to "@string/accessibility_previous",
         "style" to "@style/MusicPlayerButton"
@@ -567,11 +619,17 @@ val playerComponentsPatch = bytecodePatch(
                         invokeDirectIndex + 1, """
                             invoke-static {}, $PLAYER_CLASS_DESCRIPTOR->changeMiniPlayerColor()Z
                             move-result v$freeRegister
-                            if-eqz v$freeRegister, :off
+                            if-eqz v$freeRegister, :theme_color
                             invoke-virtual {p1}, $colorMathPlayerInvokeVirtualReference
                             move-result-object v$freeRegister
                             check-cast v$freeRegister, ${(colorMathPlayerIGetReference as FieldReference).definingClass}
                             iget v$freeRegister, v$freeRegister, $colorMathPlayerIGetReference
+                            invoke-static {v$freeRegister}, $PLAYER_CLASS_DESCRIPTOR->setLastMiniplayerColor(I)V
+                            iput v$freeRegister, p0, $colorMathPlayerIPutReference
+                            goto :off
+                            :theme_color
+                            invoke-static {}, $PLAYER_CLASS_DESCRIPTOR->getMiniPlayerThemeColor()I
+                            move-result v$freeRegister
                             iput v$freeRegister, p0, $colorMathPlayerIPutReference
                             :off
                             invoke-direct {p0}, $invokeDirectReference
@@ -581,12 +639,22 @@ val playerComponentsPatch = bytecodePatch(
                 }
             }
         } else {
-            ModernSwitchToggleColorFingerprint.let { fingerprint ->
+            // modified by lavinhoque33, 2026-10-04
+            // 9.40: the (state, J) color method no longer calls `state.a()` + check-cast; the color
+            // ints are read from a field of the state object, and the default color field is stored
+            // from a theme attribute instead of getColor. Keep the old shape first, fall back to 9.40.
+            val legacyToggleMatch = runCatching { ModernSwitchToggleColorFingerprint.match() }.getOrNull()
+
+            val toggleMethodParameters: List<CharSequence>
+            val readColorSmali: (Int) -> String
+            val colorMathPlayerIPutReference: Reference
+
+            if (legacyToggleMatch != null) {
                 val colorMathPlayerInvokeVirtualReference =
-                    fingerprint.instructionMatches.last()
+                    legacyToggleMatch.instructionMatches.last()
                         .getInstruction<ReferenceInstruction>().reference
                 val colorMathPlayerIGetReference =
-                    fingerprint.instructionMatches[4]
+                    legacyToggleMatch.instructionMatches[4]
                         .getInstruction<ReferenceInstruction>().reference as FieldReference
 
                 val constructor = ModernMiniPlayerConstructorFingerprint.method
@@ -594,36 +662,68 @@ val playerComponentsPatch = bytecodePatch(
                     getReference<MethodReference>()?.name == "getColor"
                 }
                 val iPutIndex = constructor.indexOfFirstInstructionOrThrow(colorGreyIndex, Opcode.IPUT)
-                val colorMathPlayerIPutReference =
+
+                toggleMethodParameters = legacyToggleMatch.originalMethod.parameters.map { it.type }
+                colorMathPlayerIPutReference =
                     constructor.getInstruction<ReferenceInstruction>(iPutIndex).reference
-
-                ModernMiniPlayerConstructorFingerprint.classDef.methods.single { method ->
-                    method.accessFlags == AccessFlags.PUBLIC or AccessFlags.FINAL &&
-                            method.returnType == "V" &&
-                            method.parameters == fingerprint.originalMethod.parameters
-                }.apply {
-                    val freeRegister = implementation!!.registerCount - parameters.size - 3
-                    val invokeDirectIndex = indexOfFirstInstructionReversedOrThrow(Opcode.INVOKE_DIRECT)
-                    val invokeDirectReference =
-                        getInstruction<ReferenceInstruction>(invokeDirectIndex).reference
-
-                    addInstructionsWithLabels(
-                        invokeDirectIndex + 1,
-                        """
-                            invoke-static {}, $PLAYER_CLASS_DESCRIPTOR->changeMiniPlayerColor()Z
-                            move-result v$freeRegister
-                            if-eqz v$freeRegister, :off
-                            invoke-virtual {p1}, $colorMathPlayerInvokeVirtualReference
-                            move-result-object v$freeRegister
-                            check-cast v$freeRegister, ${colorMathPlayerIGetReference.definingClass}
-                            iget v$freeRegister, v$freeRegister, $colorMathPlayerIGetReference
-                            iput v$freeRegister, p0, $colorMathPlayerIPutReference
-                            :off
-                            invoke-direct {p0}, $invokeDirectReference
-                        """
-                    )
-                    removeInstruction(invokeDirectIndex)
+                readColorSmali = { register ->
+                    """
+                        invoke-virtual {p1}, $colorMathPlayerInvokeVirtualReference
+                        move-result-object v$register
+                        check-cast v$register, ${colorMathPlayerIGetReference.definingClass}
+                        iget v$register, v$register, $colorMathPlayerIGetReference
+                    """
                 }
+            } else {
+                val toggleMatch = ModernSwitchToggleColorFieldFingerprint
+                val stateFieldReference = toggleMatch.instructionMatches[5]
+                    .getInstruction<ReferenceInstruction>().reference
+                val colorIGetReference = toggleMatch.instructionMatches[6]
+                    .getInstruction<ReferenceInstruction>().reference
+
+                toggleMethodParameters = toggleMatch.originalMethod.parameters.map { it.type }
+                // The constructor may already be modified by earlier hooks, so read the matched
+                // instruction itself instead of indexing into the mutable method.
+                colorMathPlayerIPutReference =
+                    ModernMiniPlayerDefaultColorFieldFingerprint.instructionMatches.last()
+                        .getInstruction<ReferenceInstruction>().reference
+                readColorSmali = { register ->
+                    """
+                        iget-object v$register, p1, $stateFieldReference
+                        iget v$register, v$register, $colorIGetReference
+                    """
+                }
+            }
+
+            ModernMiniPlayerConstructorFingerprint.classDef.methods.single { method ->
+                method.accessFlags == AccessFlags.PUBLIC or AccessFlags.FINAL &&
+                        method.returnType == "V" &&
+                        method.parameters.map { it.type } == toggleMethodParameters
+            }.apply {
+                val freeRegister = implementation!!.registerCount - parameters.size - 3
+                val invokeDirectIndex = indexOfFirstInstructionReversedOrThrow(Opcode.INVOKE_DIRECT)
+                val invokeDirectReference =
+                    getInstruction<ReferenceInstruction>(invokeDirectIndex).reference
+
+                addInstructionsWithLabels(
+                    invokeDirectIndex + 1,
+                    """
+                        invoke-static {}, $PLAYER_CLASS_DESCRIPTOR->changeMiniPlayerColor()Z
+                        move-result v$freeRegister
+                        if-eqz v$freeRegister, :theme_color
+                        ${readColorSmali(freeRegister)}
+                        invoke-static {v$freeRegister}, $PLAYER_CLASS_DESCRIPTOR->setLastMiniplayerColor(I)V
+                        iput v$freeRegister, p0, $colorMathPlayerIPutReference
+                        goto :off
+                        :theme_color
+                        invoke-static {}, $PLAYER_CLASS_DESCRIPTOR->getMiniPlayerThemeColor()I
+                        move-result v$freeRegister
+                        iput v$freeRegister, p0, $colorMathPlayerIPutReference
+                        :off
+                        invoke-direct {p0}, $invokeDirectReference
+                    """
+                )
+                removeInstruction(invokeDirectIndex)
             }
 
             if (is_9_15_or_greater) {
@@ -634,7 +734,50 @@ val playerComponentsPatch = bytecodePatch(
         addSwitchPreference(
             CategoryType.PLAYER,
             "revanced_change_miniplayer_color",
-            "true"
+            "false"
+        )
+        addSwitchPreference(
+            CategoryType.PLAYER,
+            "revanced_music_change_navigation_bar_color",
+            "false",
+            "revanced_change_miniplayer_color"
+        )
+
+        // Only the visible tab bar branch is patched. Registering the view lets
+        // the extension repaint it immediately when the miniplayer color changes.
+        ChangeMiniplayerColorNavigationBarFingerprint.let {
+            it.method.apply {
+                val setBackgroundColorIndex = it.instructionMatches.last().index
+                val call = getInstruction<FiveRegisterInstruction>(setBackgroundColorIndex)
+                val tabLayoutRegister = call.registerC
+                val colorRegister = call.registerD
+
+                addInstructions(
+                    setBackgroundColorIndex,
+                    """
+                        invoke-static {v$tabLayoutRegister, v$colorRegister}, $PLAYER_CLASS_DESCRIPTOR->registerNavigationBar(Landroid/view/View;I)V
+                        invoke-static {v$colorRegister}, $PLAYER_CLASS_DESCRIPTOR->overrideNavigationBarColor(I)I
+                        move-result v$colorRegister
+                    """
+                )
+            }
+        }
+
+        // Clear the cached tint when the queue/miniplayer is dismissed.
+        val musicActivityWidgetMethod = musicActivityWidgetFingerprint.methodOrThrow()
+        val widgetIndex = musicActivityWidgetMethod.indexOfFirstLiteralInstructionOrThrow(79500L)
+        val musicActivityPeerClass = (
+            musicActivityWidgetMethod.getInstruction<ReferenceInstruction>(
+                musicActivityWidgetMethod.indexOfFirstInstructionReversedOrThrow(
+                    widgetIndex,
+                    Opcode.IGET_OBJECT
+                )
+            ).reference as FieldReference
+        ).definingClass
+
+        watchWhileDismissedFingerprint(musicActivityPeerClass).method.addInstructions(
+            0,
+            "invoke-static {}, $PLAYER_CLASS_DESCRIPTOR->onMiniplayerDismissed()V"
         )
         addSwitchPreference(
             CategoryType.PLAYER,
@@ -723,11 +866,24 @@ val playerComponentsPatch = bytecodePatch(
 
                 getInstruction<ReferenceInstruction>(targetIndex).reference.toString()
             }
-            mainActivityOnStartMethod.apply {
-                val insertIndex = indexOfFirstInstructionOrThrow {
-                    opcode == Opcode.IGET_OBJECT &&
-                            getReference<FieldReference>()?.toString() == viewPagerReference
-                }
+            // modified by lavinhoque33, 2026-10-04
+            // 9.40: the view pager callbacks are no longer registered in MusicActivity.onStart();
+            // that code moved to a method of the miniplayer controller class (called from onStart).
+            fun Method.indexOfViewPagerGet() = indexOfFirstInstruction {
+                opcode == Opcode.IGET_OBJECT &&
+                        getReference<FieldReference>()?.toString() == viewPagerReference
+            }
+
+            val gestureMethod = if (mainActivityOnStartMethod.indexOfViewPagerGet() >= 0) {
+                mainActivityOnStartMethod
+            } else {
+                ModernMiniPlayerConstructorFingerprint.classDef.methods.firstOrNull {
+                    it.indexOfViewPagerGet() >= 0
+                } ?: throw PatchException("Could not find view pager gesture registration method")
+            }
+
+            gestureMethod.apply {
+                val insertIndex = indexOfViewPagerGet()
                 val insertRegister = getInstruction<TwoRegisterInstruction>(insertIndex).registerA
                 val jumpIndex =
                     indexOfFirstInstructionOrThrow(insertIndex, Opcode.INVOKE_VIRTUAL) + 1
@@ -1046,7 +1202,13 @@ val playerComponentsPatch = bytecodePatch(
                         val freeRegister =
                             getInstruction<FiveRegisterInstruction>(bottomSheetBehaviorIndex).registerD
 
-                        val getFieldIndex = bottomSheetBehaviorIndex - 2
+                        // modified by lavinhoque33, 2026-10-04
+                        // 9.40: the `const/4` between the iget-object and the behavior call was hoisted
+                        // to the method start, so the iget-object is directly before the invoke.
+                        val getFieldIndex = indexOfFirstInstructionReversedOrThrow(
+                            bottomSheetBehaviorIndex,
+                            Opcode.IGET_OBJECT
+                        )
                         val getFieldReference =
                             getInstruction<ReferenceInstruction>(getFieldIndex).reference
                         val getFieldInstruction = getInstruction<TwoRegisterInstruction>(getFieldIndex)
@@ -1237,46 +1399,68 @@ val playerComponentsPatch = bytecodePatch(
 
         // region patch for hide song video toggle
 
-        audioVideoSwitchToggleFingerprint.methodOrThrow().apply {
-            implementation!!.instructions
-                .withIndex()
-                .filter { (_, instruction) ->
-                    val reference = (instruction as? ReferenceInstruction)?.reference
-                    instruction.opcode == Opcode.INVOKE_VIRTUAL &&
-                            reference is MethodReference &&
-                            reference.toString().endsWith(AUDIO_VIDEO_SWITCH_TOGGLE_VISIBILITY)
-                }
-                .map { (index, _) -> index }
-                .reversed()
-                .forEach { index ->
-                    val instruction = getInstruction<FiveRegisterInstruction>(index)
+        // modified by lavinhoque33, 2026-10-07
+        // 9.40: the presenter class has several methods (g/e/f) calling AudioVideoSwitcherToggleView.setVisibility,
+        // so rewrite every call in the matched class instead of only the method picked by the fingerprint.
+        // Flag 45671274 no longer exists in 9.40; the feature works through the setVisibility hook alone.
+        var songVideoToggleVisibilityHooked = false
+        if (audioVideoSwitchToggleFingerprint.resolvable()) {
+            audioVideoSwitchToggleFingerprint.mutableClassOrThrow().methods.forEach { toggleMethod ->
+                val toggleImplementation = toggleMethod.implementation ?: return@forEach
+                toggleImplementation.instructions
+                    .withIndex()
+                    .filter { (_, instruction) ->
+                        val reference = (instruction as? ReferenceInstruction)?.reference
+                        instruction.opcode == Opcode.INVOKE_VIRTUAL &&
+                                reference is MethodReference &&
+                                reference.toString().endsWith(AUDIO_VIDEO_SWITCH_TOGGLE_VISIBILITY)
+                    }
+                    .map { (index, _) -> index }
+                    .reversed()
+                    .forEach { index ->
+                        val instruction = toggleMethod.getInstruction<FiveRegisterInstruction>(index)
 
-                    replaceInstruction(
-                        index,
-                        "invoke-static {v${instruction.registerC}, v${instruction.registerD}}," +
-                                "$PLAYER_CLASS_DESCRIPTOR->hideSongVideoToggle(Landroid/view/View;I)V"
-                    )
-                }
+                        toggleMethod.replaceInstruction(
+                            index,
+                            "invoke-static {v${instruction.registerC}, v${instruction.registerD}}," +
+                                    "$PLAYER_CLASS_DESCRIPTOR->hideSongVideoToggle(Landroid/view/View;I)V"
+                        )
+                        songVideoToggleVisibilityHooked = true
+                    }
+            }
         }
 
-        if (is_8_05_or_greater) {
+        var songVideoToggleFlagHooked = false
+        if (is_8_05_or_greater && audioVideoSwitchToggleFeatureFlagsFingerprint.resolvable()) {
             audioVideoSwitchToggleFeatureFlagsFingerprint.injectLiteralInstructionBooleanCall(
                 AUDIO_VIDEO_SWITCH_TOGGLE_FEATURE_FLAG,
                 "$PLAYER_CLASS_DESCRIPTOR->hideSongVideoToggle(Z)Z"
             )
+            songVideoToggleFlagHooked = true
         }
 
-        addSwitchPreference(
-            CategoryType.PLAYER,
-            "revanced_hide_song_video_toggle",
-            "false"
-        )
+        // The setting is not shown when it has no effect.
+        if (!songVideoToggleVisibilityHooked && !songVideoToggleFlagHooked) {
+            printWarn("\"Hide Song / Video toggle\" is not supported in this version. Use YouTube Music versions up to 9.40.")
+        } else {
+            addSwitchPreference(
+                CategoryType.PLAYER,
+                "revanced_hide_song_video_toggle",
+                "false"
+            )
+        }
 
         // endregion
 
         // region patch for remember repeat state
 
-        val (repeatTrackMethod, repeatTrackIndex) = repeatTrackFingerprint.matchOrThrow().let {
+        // modified by lavinhoque33, 2026-10-04
+        // 9.40: check-casts were added between the field loads and `equals`, breaking the contiguous
+        // opcode pattern of the legacy fingerprint. Fall back to matching `equals; move-result; if-nez`.
+        val (repeatTrackMethod, repeatTrackIndex) = (
+            repeatTrackFingerprint.matchOrNull()
+                ?: ModernRepeatTrackFingerprint.let { it.match() }
+            ).let {
             with(it.method) {
                 val targetIndex = it.instructionMatches.last().index
                 val targetRegister = getInstruction<OneRegisterInstruction>(targetIndex).registerA
@@ -1342,23 +1526,6 @@ val playerComponentsPatch = bytecodePatch(
                 classDef.type == shuffleClass
             } ?: throw PatchException("shuffle class not found")
 
-            val smaliInstructions =
-                """
-                    if-eqz v0, :ignore
-                    sget-object v1, $enumClass->b:$enumClass
-                    invoke-virtual {v0, v1}, $shuffleClass->shuffleTracks($enumClass)V
-                    :ignore
-                    return-void
-                """
-
-            addStaticFieldToExtension(
-                EXTENSION_VIDEO_UTILS_CLASS_DESCRIPTOR,
-                "shuffleTracks",
-                "shuffleClass",
-                shuffleClass,
-                smaliInstructions
-            )
-
             // endregion
 
             // region make all methods accessible
@@ -1383,6 +1550,50 @@ val playerComponentsPatch = bytecodePatch(
             val shuffleMethod = shuffleMutableClass.methods.find { method ->
                 method.isShuffleMethod()
             } ?: throw PatchException("shuffle method not found")
+
+            // modified by lavinhoque33, 2026-10-05
+            // YouTube Music 9.40: R8 merged the shuffle class with unrelated classes (all fields are Object,
+            // ten constructors). Hooking every constructor stored whichever variant was created last, and
+            // shuffleTracks then crashed with a ClassCastException. Only hook the constructors that take the
+            // type the shuffle method casts its first own Object field to. Unmerged classes keep all constructors.
+            val shuffleVariantType = shuffleMethod.implementation!!.instructions.toList().let { instructions ->
+                instructions.withIndex().firstNotNullOfOrNull { (index, instruction) ->
+                    val field = (instruction as? ReferenceInstruction)?.reference as? FieldReference
+                    val next = instructions.getOrNull(index + 1)
+                    if (instruction.opcode == Opcode.IGET_OBJECT &&
+                        field?.definingClass == shuffleClass &&
+                        field.type == "Ljava/lang/Object;" &&
+                        next?.opcode == Opcode.CHECK_CAST &&
+                        (next as OneRegisterInstruction).registerA == (instruction as TwoRegisterInstruction).registerA
+                    ) {
+                        ((next as ReferenceInstruction).reference as TypeReference).type
+                    } else {
+                        null
+                    }
+                }
+            }
+
+            val smaliInstructions =
+                """
+                    if-eqz v0, :ignore
+                    sget-object v1, $enumClass->b:$enumClass
+                    invoke-virtual {v0, v1}, $shuffleClass->shuffleTracks($enumClass)V
+                    :ignore
+                    return-void
+                """
+
+            addStaticFieldToExtension(
+                EXTENSION_VIDEO_UTILS_CLASS_DESCRIPTOR,
+                "shuffleTracks",
+                "shuffleClass",
+                shuffleClass,
+                smaliInstructions,
+                constructorFilter = { constructor ->
+                    shuffleVariantType == null ||
+                            constructor.parameterTypes.any { it.toString() == shuffleVariantType }
+                }
+            )
+
             val shuffleMethodRegisterCount = shuffleMethod.implementation!!.registerCount
             val isShuffleParameterNeeded = shuffleMethod.parameters.isEmpty() && is_8_03_or_greater
 

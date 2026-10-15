@@ -1,35 +1,34 @@
 package app.morphe.patches.music.layout.translations
 
-import app.morphe.patcher.patch.bytecodePatch
 import app.morphe.patcher.patch.filePathOption
 import app.morphe.patcher.patch.resourcePatch
 import app.morphe.patcher.patch.stringOption
 import app.morphe.patches.music.utils.compatibility.Constants.COMPATIBILITY_YOUTUBE_MUSIC
 import app.morphe.patches.music.utils.patch.PatchList.TRANSLATIONS_FOR_YOUTUBE_MUSIC
-import app.morphe.patches.music.utils.settings.CategoryType
 import app.morphe.patches.music.utils.settings.ResourceUtils.updatePatchStatus
-import app.morphe.patches.music.utils.settings.addLinkPreference
 import app.morphe.patches.music.utils.settings.settingsPatch
 import app.morphe.patches.shared.translations.APP_LANGUAGES
 import app.morphe.patches.shared.translations.baseTranslationsPatch
 
 // Array of supported translations, each represented by its language code.
 private val SUPPORTED_TRANSLATIONS = setOf(
-    "bg-rBG", "bn", "cs-rCZ", "el-rGR", "es-rES", "fr-rFR", "hu-rHU", "id-rID", "in", "it-rIT",
-    "ja-rJP", "ko-rKR", "nl-rNL", "pl-rPL", "pt-rBR", "ro-rRO", "ru-rRU", "ta-rIN", "tr-rTR", "uk-rUA",
-    "vi-rVN", "zh-rCN", "zh-rTW"
+    "ar",
+    "de-rDE",
+    "es-rES",
+    "fr-rFR",
+    "hu-rHU",
+    "in",
+    "it-rIT",
+    "ja-rJP",
+    "ko-rKR",
+    "pl-rPL",
+    "pt-rBR",
+    "ru-rRU",
+    "tr-rTR",
+    "uk-rUA",
+    "zh-rCN",
+    "zh-rTW",
 )
-
-@Suppress("unused")
-val translationsBytecodePatch = bytecodePatch {
-    execute {
-        addLinkPreference(
-            CategoryType.MISC,
-            "revanced_translations",
-            "https://rvxtranslate.vercel.app/"
-        )
-    }
-}
 
 @Suppress("unused")
 val translationsPatch = resourcePatch(
@@ -37,7 +36,7 @@ val translationsPatch = resourcePatch(
     TRANSLATIONS_FOR_YOUTUBE_MUSIC.summary,
 ) {
     compatibleWith(COMPATIBILITY_YOUTUBE_MUSIC)
-    dependsOn(translationsBytecodePatch, settingsPatch)
+    dependsOn(settingsPatch)
 
     val customTranslations by filePathOption(
         key = "customTranslations",

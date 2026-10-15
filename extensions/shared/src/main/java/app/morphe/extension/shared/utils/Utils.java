@@ -427,6 +427,9 @@ public class Utils {
 
         // Must initially set context to check the app language.
         context = appContext;
+        if (appContext instanceof Activity activity) {
+            setActivity(activity);
+        }
         Logger.printInfo(() -> "Set context: " + appContext);
 
         BaseThemeUtils.setThemeColor();
@@ -611,7 +614,17 @@ public class Utils {
      *        when the size exceeds {@code maxSize}.
      */
     public static <T, V> Map<T, V> createSizeRestrictedMap(int maxSize) {
-        return new LinkedHashMap<>(2 * maxSize) {
+        return createSizeRestrictedMap(maxSize, false);
+    }
+
+    /**
+     * @param maxSize     The maximum number of elements to keep in the map.
+     * @param accessOrder The ordering mode - <tt>true</tt> for access-order, <tt>false</tt> for insertion-order.
+     * @return A {@link LinkedHashMap} that automatically evicts the eldest entry
+     *        when the size exceeds {@code maxSize}.
+     */
+    public static <T, V> Map<T, V> createSizeRestrictedMap(int maxSize, boolean accessOrder) {
+        return new LinkedHashMap<>(2 * maxSize, 0.75f, accessOrder) {
             @Override
             protected boolean removeEldestEntry(Entry eldest) {
                 return size() > maxSize;
