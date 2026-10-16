@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/athretv/revanced-patches/compare/v1.12.0...v1.13.0) (2026-10-16)
+
+
+### Features
+
+* default dark theme to amoled black and update credits url ([798c57b](https://github.com/athretv/revanced-patches/commit/798c57b65f6081c3423fc01de3909c2a6e64c5ae))
+
 # [1.12.0](https://github.com/athretv/revanced-patches/compare/v1.11.0...v1.12.0) (2026-10-15)
 
 
