@@ -69,7 +69,7 @@ public class AppInfoDialogBuilder {
             long patchedTime = PatchedTime();
             Date date = new Date(patchedTime);
 
-            final String creditsUrl = "https://github.com/anddea/revanced-patches/wiki/Credits";
+            final String creditsUrl = "https://github.com/athretv/revanced-patches";
 
             final String htmlDialog = "<html>" +
                     "<body style=\"padding: 15px;\"><p>" +

@@ -14,7 +14,7 @@ public class CreditsPreference extends Preference {
     {
         setOnPreferenceClickListener(pref -> {
             Intent i = new Intent(Intent.ACTION_VIEW);
-            i.setData(Uri.parse("https://github.com/anddea/revanced-patches/wiki/Credits"));
+            i.setData(Uri.parse("https://github.com/athretv/revanced-patches"));
             pref.getContext().startActivity(i);
             return false;
         });

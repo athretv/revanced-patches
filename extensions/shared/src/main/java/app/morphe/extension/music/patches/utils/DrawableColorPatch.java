@@ -95,7 +95,7 @@ import app.morphe.extension.shared.utils.ResourceUtils;
 
 @SuppressWarnings({"unused", "deprecation"})
 public class DrawableColorPatch {
-    public static final String DEFAULT_DARK_THEME = "modern_youtube";
+    public static final String DEFAULT_DARK_THEME = "amoled_black";
     public static final String DEFAULT_DARK_THEME_CUSTOM_COLOR = "#FF000000";
     public static final String DEFAULT_NOTIFICATION_DOT_COLOR = "#FFFF0000";
 

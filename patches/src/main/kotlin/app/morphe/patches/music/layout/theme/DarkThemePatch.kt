@@ -91,7 +91,7 @@ private const val SPLASH_THEME_PREFIX = "morphe_theme_splash_"
 private const val SPLASH_THEME_NO_ICON_SUFFIX = "_no_icon"
 private const val SPLASH_THEME_PARENT = "@style/Theme.YouTubeMusic"
 private const val PRECOMPILED_THEME_QUALIFIER_BASE = 801
-private const val DEFAULT_DARK_THEME_COLOR = "#FF0F0F0F"
+private const val DEFAULT_DARK_THEME_COLOR = "#FF000000"
 
 // These are the native YT Music dark-palette values. On Android 11+ the extension redefines the
 // runtime colors with a ResourcesLoader table that it builds for the IDs assigned below.
@@ -387,7 +387,7 @@ val darkThemePatch = resourcePatch(
 
         addSplashTheme(customDarkThemeColor)
 
-        addListPreference(CategoryType.GENERAL, "morphe_dark_theme", setSummary = false)
+        addListPreference(CategoryType.GENERAL, "morphe_dark_theme", setSummary = false, defaultValue = "amoled_black")
         addCustomPreference(
             CategoryType.GENERAL,
             "morphe_dark_theme_custom_color",

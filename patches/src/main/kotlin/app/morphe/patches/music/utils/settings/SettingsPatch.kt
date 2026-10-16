@@ -597,10 +597,11 @@ internal fun addListPreference(
     setSummary: Boolean = true,
     entriesKey: String = "${key}_entries",
     entryValuesKey: String = "${key}_entry_values",
+    defaultValue: String? = null,
 ) {
     val categoryValue = category.value
     ResourceUtils.addPreferenceCategory(categoryValue)
-    ResourceUtils.addListPreference(categoryValue, key, dependencyKey, setSummary, entriesKey, entryValuesKey)
+    ResourceUtils.addListPreference(categoryValue, key, dependencyKey, setSummary, entriesKey, entryValuesKey, defaultValue)
 }
 
 /** Adds a text preference that is handled by the current settings fragment. */

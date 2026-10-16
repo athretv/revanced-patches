@@ -435,6 +435,7 @@ internal object ResourceUtils {
         setSummary: Boolean,
         entriesKey: String = "${key}_entries",
         entryValuesKey: String = "${key}_entry_values",
+        defaultValue: String? = null,
     ) {
         context.document(SETTINGS_HEADER_PATH).use { document ->
             val tags = document.getElementsByTagName(PREFERENCE_SCREEN_TAG_NAME)
@@ -451,6 +452,9 @@ internal object ResourceUtils {
                         setAttribute("android:key", key)
                         setAttribute("android:entries", "@array/$entriesKey")
                         setAttribute("android:entryValues", "@array/$entryValuesKey")
+                        if (!defaultValue.isNullOrEmpty()) {
+                            setAttribute("android:defaultValue", defaultValue)
+                        }
                         if (dependencyKey.isNotEmpty()) {
                             setAttribute("android:dependency", dependencyKey)
                         }

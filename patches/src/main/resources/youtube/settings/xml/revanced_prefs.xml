@@ -15,7 +15,7 @@
             <SwitchPreference android:title="@string/morphe_custom_branding_apply_to_rvx_settings_title" android:key="morphe_custom_branding_apply_to_rvx_settings" android:summary="@string/morphe_custom_branding_apply_to_rvx_settings_summary" />SETTINGS: CUSTOM_BRANDING -->
 
             <!-- SETTINGS: RUNTIME_THEME
-            <app.morphe.extension.shared.settings.preference.CustomDialogListPreference android:title="@string/morphe_dark_theme_title" android:key="morphe_dark_theme" android:entries="@array/morphe_dark_theme_entries" android:entryValues="@array/morphe_dark_theme_entry_values" />
+            <app.morphe.extension.shared.settings.preference.CustomDialogListPreference android:title="@string/morphe_dark_theme_title" android:key="morphe_dark_theme" android:defaultValue="amoled_black" android:entries="@array/morphe_dark_theme_entries" android:entryValues="@array/morphe_dark_theme_entry_values" />
             <app.morphe.extension.shared.settings.preference.ColorPickerPreference android:title="@string/morphe_dark_theme_custom_color_title" android:key="morphe_dark_theme_custom_color" android:summary="@string/morphe_dark_theme_custom_color_summary" />
             <app.morphe.extension.shared.settings.preference.CustomDialogListPreference android:title="@string/morphe_light_theme_title" android:key="morphe_light_theme" android:entries="@array/morphe_light_theme_entries" android:entryValues="@array/morphe_light_theme_entry_values" />
             <app.morphe.extension.shared.settings.preference.ColorPickerPreference android:title="@string/morphe_light_theme_custom_color_title" android:key="morphe_light_theme_custom_color" android:summary="@string/morphe_dark_theme_custom_color_summary" />

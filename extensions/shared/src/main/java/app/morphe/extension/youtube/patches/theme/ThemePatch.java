@@ -91,7 +91,7 @@ import app.morphe.extension.youtube.settings.Settings;
 
 @SuppressWarnings({"unused", "deprecation"})
 public final class ThemePatch {
-    public static final String DEFAULT_DARK_THEME = "stock";
+    public static final String DEFAULT_DARK_THEME = "amoled_black";
     public static final String DEFAULT_LIGHT_THEME = "white";
     public static final String DEFAULT_DARK_THEME_CUSTOM_COLOR = "#FF000000";
     public static final String DEFAULT_LIGHT_THEME_CUSTOM_COLOR = "#FFFFFFFF";
@@ -262,7 +262,7 @@ public final class ThemePatch {
             final String themePrefix = dark
                     ? SPLASH_THEME_DARK_PREFIX
                     : SPLASH_THEME_LIGHT_PREFIX;
-            final String fallbackTheme = dark ? "stock" : "white";
+            final String fallbackTheme = dark ? "amoled_black" : "white";
             final String selectedTheme = dark
                     ? Settings.DARK_THEME.get()
                     : Settings.LIGHT_THEME.get();

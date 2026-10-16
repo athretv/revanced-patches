@@ -391,7 +391,7 @@ public final class CustomBrandingPatch {
                             BaseThemeUtils.isDarkModeEnabled());
             String themeKey = Setting.preferences.getString(
                     dark ? DARK_THEME_KEY : LIGHT_THEME_KEY,
-                    dark ? "stock" : "white");
+                    dark ? "amoled_black" : "white");
             String appearanceKey = (dark ? "dark_" : "light_") + themeKey;
             String combinedThemeName = baseThemeName
                     + SYSTEM_SPLASH_THEME_SEPARATOR + appearanceKey;
@@ -401,7 +401,7 @@ public final class CustomBrandingPatch {
             }
 
             String fallbackThemeName = baseThemeName + SYSTEM_SPLASH_THEME_SEPARATOR
-                    + (dark ? "dark_stock" : "light_white");
+                    + (dark ? "dark_amoled_black" : "light_white");
             if (ResourceUtils.getIdentifier(
                     fallbackThemeName, ResourceType.STYLE, context) != 0) {
                 return fallbackThemeName;
@@ -414,7 +414,7 @@ public final class CustomBrandingPatch {
                 ResourceType.STYLE,
                 context) != 0;
         if (hasMusicThemes) {
-            String themeKey = Setting.preferences.getString(DARK_THEME_KEY, "modern_youtube");
+            String themeKey = Setting.preferences.getString(DARK_THEME_KEY, "amoled_black");
             String combinedThemeName = baseThemeName
                     + SYSTEM_SPLASH_THEME_SEPARATOR + themeKey;
             if (ResourceUtils.getIdentifier(
@@ -423,7 +423,7 @@ public final class CustomBrandingPatch {
             }
 
             String fallbackThemeName = baseThemeName
-                    + SYSTEM_SPLASH_THEME_SEPARATOR + "modern_youtube";
+                    + SYSTEM_SPLASH_THEME_SEPARATOR + "amoled_black";
             if (ResourceUtils.getIdentifier(
                     fallbackThemeName, ResourceType.STYLE, context) != 0) {
                 return fallbackThemeName;
